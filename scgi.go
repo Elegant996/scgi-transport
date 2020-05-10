@@ -16,9 +16,12 @@ package scgi
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +64,9 @@ func (Transport) CaddyModule() caddy.ModuleInfo {
 // Provision sets up t.
 func (t *Transport) Provision(ctx caddy.Context) error {
 	t.logger = ctx.Logger(t)
+	if t.Root == "" {
+		t.Root = "{http.vars.root}"
+	}
 	t.serverSoftware = "Caddy"
 	if mod := caddy.GoModule(); mod.Version != "" {
 		t.serverSoftware += "/" + mod.Version
@@ -118,6 +124,8 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	var resp *http.Response
 	switch r.Method {
+	case http.MethodHead:
+		resp, err = scgiBackend.Head(env)
 	case http.MethodGet:
 		resp, err = scgiBackend.Get(env, r.Body, contentLength)
 	default:
@@ -146,10 +154,40 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 	ip = strings.Replace(ip, "[", "", 1)
 	ip = strings.Replace(ip, "]", "", 1)
 
+	// make sure file root is absolute
+	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
+	if err != nil {
+		return nil, err
+	}
+
+	fpath := r.URL.Path
+
+	// split "actual path" from "path info" if configured
+	var docURI, pathInfo string
+	if splitPos := t.splitPos(fpath); splitPos > -1 {
+		docURI = fpath[:splitPos]
+		pathInfo = fpath[splitPos:]
+	} else {
+		docURI = fpath
+	}
+	scriptName := fpath
+
+	// Strip PATH_INFO from SCRIPT_NAME
+	scriptName = strings.TrimSuffix(scriptName, pathInfo)
+
+	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
+	scriptFilename := filepath.Join(root, scriptName)
+
+	// Add vhost path prefix to scriptName. Otherwise, some PHP software will
+	// have difficulty discovering its URL.
+	pathPrefix, _ := r.Context().Value(caddy.CtxKey("path_prefix")).(string)
+	scriptName = path.Join(pathPrefix, scriptName)
+
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the
 	// original URI in as the value of REQUEST_URI (the user can overwrite this
-	// if desired). This is how nginx defaults: http://stackoverflow.com/a/12485156/1048862
+	// if desired). Most PHP apps seem to want the original URI. Besides, this is
+	// how nginx defaults: http://stackoverflow.com/a/12485156/1048862
 	origReq, ok := r.Context().Value(caddyhttp.OriginalRequestCtxKey).(http.Request)
 	if !ok {
 		// some requests, like active health checks, don't add this to
@@ -159,6 +197,9 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 	reqURL := origReq.URL
 
 	requestScheme := "http"
+	if r.TLS != nil {
+		requestScheme = "https"
+	}
 
 	reqHost, reqPort, err := net.SplitHostPort(r.Host)
 	if err != nil {
@@ -174,7 +215,7 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 		"CONTENT_LENGTH":    r.Header.Get("Content-Length"),
 		"CONTENT_TYPE":      r.Header.Get("Content-Type"),
 		"GATEWAY_INTERFACE": "CGI/1.1",
-		"PATH_INFO":         "", // Not used
+		"PATH_INFO":         pathInfo,
 		"QUERY_STRING":      r.URL.RawQuery,
 		"REMOTE_ADDR":       ip,
 		"REMOTE_HOST":       ip, // For speed, remote host lookups disabled
@@ -189,9 +230,43 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 		"SERVER_SOFTWARE":   t.serverSoftware,
 
 		// Other variables
+		"DOCUMENT_ROOT":   root,
+		"DOCUMENT_URI":    docURI,
 		"HTTP_HOST":       r.Host, // added here, since not always part of headers
 		"REQUEST_URI":     reqURL.RequestURI(),
 		"SCGI":            "1", // Required
+		"SCRIPT_FILENAME": scriptFilename,
+		"SCRIPT_NAME":     scriptName,
+	}
+
+	// compliance with the CGI specification requires that
+	// PATH_TRANSLATED should only exist if PATH_INFO is defined.
+	// Info: https://www.ietf.org/rfc/rfc3875 Page 14
+	if env["PATH_INFO"] != "" {
+		env["PATH_TRANSLATED"] = filepath.Join(root, pathInfo) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
+	}
+
+	// Some web apps rely on knowing HTTPS or not
+	if r.TLS != nil {
+		env["HTTPS"] = "on"
+		// and pass the protocol details in a manner compatible with apache's mod_ssl
+		// (which is why these have a SSL_ prefix and not TLS_).
+		v, ok := tlsProtocolStrings[r.TLS.Version]
+		if ok {
+			env["SSL_PROTOCOL"] = v
+		}
+		// and pass the cipher suite in a manner compatible with apache's mod_ssl
+		for _, cs := range caddytls.SupportedCipherSuites() {
+			if cs.ID == r.TLS.CipherSuite {
+				env["SSL_CIPHER"] = cs.Name
+				break
+			}
+		}
+	}
+
+	// Add env variables from config (with support for placeholders in values)
+	for key, value := range t.EnvVars {
+		env[key] = repl.ReplaceAll(value, "")
 	}
 
 	// Add all HTTP headers to env variables
@@ -201,6 +276,31 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 		env["HTTP_"+header] = strings.Join(val, ", ")
 	}
 	return env, nil
+}
+
+// splitPos returns the index where path should
+// be split based on t.SplitPath.
+func (t Transport) splitPos(path string) int {
+	// TODO: from v1...
+	// if httpserver.CaseSensitivePath {
+	// 	return strings.Index(path, r.SplitPath)
+	// }
+	lowerPath := strings.ToLower(path)
+	for _, split := range t.SplitPath {
+		if idx := strings.Index(lowerPath, strings.ToLower(split)); idx > -1 {
+			return idx + len(split)
+		}
+	}
+	return -1
+}
+
+// Map of supported protocols to Apache ssl_mod format
+// Note that these are slightly different from SupportedProtocols in caddytls/config.go
+var tlsProtocolStrings = map[uint16]string{
+	tls.VersionTLS10: "TLSv1",
+	tls.VersionTLS11: "TLSv1.1",
+	tls.VersionTLS12: "TLSv1.2",
+	tls.VersionTLS13: "TLSv1.3",
 }
 
 var headerNameReplacer = strings.NewReplacer(" ", "_", "-", "_")
