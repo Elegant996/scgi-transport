@@ -28,7 +28,7 @@ import (
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
-	// "github.com/caddyserver/caddy/v2/modules/caddytls"
+	"github.com/caddyserver/caddy/v2/modules/caddytls"
 	"go.uber.org/zap"
 
 	"github.com/caddyserver/caddy/v2"
@@ -40,6 +40,23 @@ func init() {
 
 // Transport facilitates SCGI communication.
 type Transport struct {
+	// Use this directory as the fastcgi root directory. Defaults to the root
+	// directory of the parent virtual host.
+	Root string `json:"root,omitempty"`
+
+	// The path in the URL will be split into two, with the first piece ending
+	// with the value of SplitPath. The first piece will be assumed as the
+	// actual resource (CGI script) name, and the second piece will be set to
+	// PATH_INFO for the CGI script to use.
+	//
+	// Future enhancements should be careful to avoid CVE-2019-11043,
+	// which can be mitigated with use of a try_files-like behavior
+	// that 404s if the scgi path info is not found.
+	SplitPath []string `json:"split_path,omitempty"`
+
+	// Extra environment variables.
+	EnvVars map[string]string `json:"env,omitempty"`
+
 	// The duration used to set a deadline when connecting to an upstream.
 	DialTimeout caddy.Duration `json:"dial_timeout,omitempty"`
 
