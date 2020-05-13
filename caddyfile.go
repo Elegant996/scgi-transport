@@ -25,6 +25,10 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
 )
 
+func init() {
+	httpcaddyfile.RegisterDirective("scgi", parseSCGI)
+}
+
 // UnmarshalCaddyfile deserializes Caddyfile tokens into h.
 //
 //     transport scgi {
