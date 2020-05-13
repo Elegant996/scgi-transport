@@ -197,14 +197,13 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 
 	// Add vhost path prefix to scriptName. Otherwise, some PHP software will
 	// have difficulty discovering its URL.
-	pathPrefix, _ := r.Context().Value(caddy.CtxKey("path_prefix")).(string)
-	scriptName = path.Join(pathPrefix, scriptName)
+	// pathPrefix, _ := r.Context().Value(caddy.CtxKey("path_prefix")).(string)
+	// scriptName = path.Join(pathPrefix, scriptName)
 
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the
-	// original URI in as the value of REQUEST_URI (the user can overwrite this
-	// if desired). Most PHP apps seem to want the original URI. Besides, this is
-	// how nginx defaults: http://stackoverflow.com/a/12485156/1048862
+	// original URI in as the value of REQUEST_URI (the user can overwrite this if
+	// desired). This is how nginx defaults: http://stackoverflow.com/a/12485156/1048862
 	origReq, ok := r.Context().Value(caddyhttp.OriginalRequestCtxKey).(http.Request)
 	if !ok {
 		// some requests, like active health checks, don't add this to
