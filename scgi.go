@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -193,6 +194,10 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 
 	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
 	scriptFilename := filepath.Join(root, scriptName)
+
+	// Add vhost path prefix to scriptName.
+	pathPrefix, _ := r.Context().Value(caddy.CtxKey("path_prefix")).(string)
+	scriptName = path.Join(pathPrefix, scriptName)
 
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the

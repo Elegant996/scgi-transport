@@ -15,7 +15,14 @@
 package scgi
 
 import (
+	"encoding/json"
+
+	"github.com/caddyserver/caddy/v2"
+	"github.com/caddyserver/caddy/v2/caddyconfig"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
+	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp/reverseproxy"
 )
 
 // UnmarshalCaddyfile deserializes Caddyfile tokens into h.
@@ -58,4 +65,103 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		}
 	}
 	return nil
+}
+
+// parseSCGI parses the scgi directive, which has the same syntax
+// as the reverse_proxy directive (in fact, the reverse_proxy's directive
+// Unmarshaler is invoked by this function) but the resulting proxy is specially
+// configured to define SCRIPT_NAME to match the URI path. A line such as this:
+//
+//     scgi localhost:7777
+//
+// is equivalent to a route consisting of:
+//
+//     reverse_proxy / localhost:7777 {
+//         transport scgi {
+//             env SCRIPT_NAME {http.request.uri.path}
+//         }
+//     }
+//
+// If this "common" config is not compatible with a user's requirements,
+// they can use a manual approach based on the example above to configure
+// it precisely as they need.
+//
+// If a matcher is specified by the user, for example:
+//
+//     scgi /subpath localhost:7777
+//
+// then the resulting handlers are wrapped in a subroute that uses the
+// user's matcher as a prerequisite to enter the subroute. In other
+// words, the directive's matcher is necessary, but not sufficient.
+func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
+	if !h.Next() {
+		return nil, h.ArgErr()
+	}
+	
+	// route to actually reverse proxy requests to base URI path
+	rpMatcherSet := caddy.ModuleMap{
+		"path": h.JSON([]string{"/"}),
+	}
+
+	// if the user specified a matcher token, use that
+	// matcher in a route that wraps both of our routes;
+	// either way, strip the matcher token and pass
+	// the remaining tokens to the unmarshaler so that
+	// we can gain the rest of the reverse_proxy syntax
+	userMatcherSet, err := h.ExtractMatcherSet()
+	if err != nil {
+		return nil, err
+	}
+
+	// set up the transport for SCGI
+	scgiTransport := Transport{EnvVars: map[string]string{"SCRIPT_NAME": "{http.request.uri.path}",}}
+
+	// create the reverse proxy handler which uses our SCGI transport
+	rpHandler := &reverseproxy.Handler{
+		MatcherSetsRaw: []caddy.ModuleMap{rpMatcherSet},
+		TransportRaw: caddyconfig.JSONModuleObject(scgiTransport, "protocol", "scgi", nil),
+	}
+
+	// the rest of the config is specified by the user
+	// using the reverse_proxy directive syntax
+	// TODO: this can overwrite our scgiTransport that we encoded and
+	// set on the rpHandler... even with a non-scgi transport!
+	err = rpHandler.UnmarshalCaddyfile(h.Dispenser)
+	if err != nil {
+		return nil, err
+	}
+
+	// create the final reverse proxy route
+	rpRoute := caddyhttp.Route{
+		HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
+	}
+
+	subroute := caddyhttp.Subroute{
+		Routes: caddyhttp.RouteList{rpRoute},
+	}
+
+	// the user's matcher is a prerequisite for ours, so
+	// wrap ours in a subroute and return that
+	if userMatcherSet != nil {
+		return []httpcaddyfile.ConfigValue{
+			{
+				Class: "route",
+				Value: caddyhttp.Route{
+					MatcherSetsRaw: []caddy.ModuleMap{userMatcherSet},
+					HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(subroute, "handler", "subroute", nil)},
+				},
+			},
+		}, nil
+	}
+
+	// otherwise, return the literal subroute instead of
+	// individual routes, to ensure they stay together and
+	// are treated as a single unit, without necessarily
+	// creating an actual subroute in the output
+	return []httpcaddyfile.ConfigValue{
+		{
+			Class: "route",
+			Value: subroute,
+		},
+	}, nil
 }
