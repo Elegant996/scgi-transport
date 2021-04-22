@@ -40,7 +40,7 @@ import (
 // SCGIClient implements a SCGI client, which is a standard for
 // interfacing external applications with Web servers.
 type SCGIClient struct {
-	conn      net.Conn
+	rwc       io.ReadWriteCloser
 	keepAlive bool
 }
 
