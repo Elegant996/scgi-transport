@@ -165,7 +165,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				if err != nil {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
-				fcgiTransport.DialTimeout = caddy.Duration(dur)
+				sgiTransport.DialTimeout = caddy.Duration(dur)
 				dispenser.Delete()
 				dispenser.Delete()
 
@@ -177,7 +177,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				if err != nil {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
-				fcgiTransport.ReadTimeout = caddy.Duration(dur)
+				scgiTransport.ReadTimeout = caddy.Duration(dur)
 				dispenser.Delete()
 				dispenser.Delete()
 
@@ -189,7 +189,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				if err != nil {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
-				fcgiTransport.WriteTimeout = caddy.Duration(dur)
+				scgiTransport.WriteTimeout = caddy.Duration(dur)
 				dispenser.Delete()
 				dispenser.Delete()
 			}
@@ -219,7 +219,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// create the final reverse proxy route
 	rpRoute := caddyhttp.Route{
-		MatcherSetsRaw: []caddy.ModuleMap{rpMatcherSet},
+		MatcherSetsRaw: []caddy.ModuleMap{},
 		HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
 	}
 

@@ -216,9 +216,18 @@ func (c *SCGIClient) Head(p map[string]string) (resp *http.Response, err error) 
 	return c.Request(p, nil)
 }
 
+// Options issues an OPTIONS request to the scgi responder.
+func (c *SCGIClient) Options(p map[string]string) (resp *http.Response, err error) {
+
+	p["REQUEST_METHOD"] = "OPTIONS"
+	p["CONTENT_LENGTH"] = "0"
+
+	return c.Request(p, nil)
+}
+
 // Post issues a POST request to the scgi responder. with request body
 // in the format that bodyType specified
-func (c *SCGIClient) Post(p map[string]string, method string, body io.Reader, l int64) (resp *http.Response, err error) {
+func (c *SCGIClient) Post(p map[string]string, method string, bodyType string, body io.Reader, l int64) (resp *http.Response, err error) {
 	if p == nil {
 		p = make(map[string]string)
 	}
@@ -230,6 +239,11 @@ func (c *SCGIClient) Post(p map[string]string, method string, body io.Reader, l 
 	}
 
 	p["CONTENT_LENGTH"] = strconv.FormatInt(l, 10)
+	if len(bodyType) > 0 {
+		p["CONTENT_TYPE"] = bodyType
+	} else {
+		p["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
+	}
 
 	return c.Request(p, body)
 }

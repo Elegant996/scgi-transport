@@ -159,7 +159,7 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 	ip = strings.Replace(ip, "]", "", 1)
 
 	// make sure file root is absolute
-	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
+	root, err := filepath.Abs(repl.ReplaceAll(t.root, "."))
 	if err != nil {
 		return nil, err
 	}
@@ -170,12 +170,10 @@ func (t Transport) buildEnv(r *http.Request) (map[string]string, error) {
 	docURI := fpath
 
 	// Try to grab the path remainder from a file matcher
-	// if we didn't get a split result here.
 	// See https://github.com/caddyserver/caddy/issues/3718
-	if pathInfo == "" {
-		if remainder, ok := repl.GetString("http.matchers.file.remainder"); ok {
-			pathInfo = remainder
-		}
+	var pathInfo string
+	if remainder, ok := repl.GetString("http.matchers.file.remainder"); ok {
+		pathInfo = remainder
 	}
 
 	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
