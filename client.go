@@ -155,7 +155,7 @@ type clientCloser struct {
 	io.Reader
 }
 
-func (f clientCloser) Close() error { return f.conn.Close() }
+func (s clientCloser) Close() error { return s.rwc.Close() }
 
 // Request returns a HTTP Response with Header and Body
 // from scgi responder
