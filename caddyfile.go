@@ -49,6 +49,36 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				t.EnvVars[args[0]] = args[1]
 
+			case "dial_timeout":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("bad timeout value %s: %v", d.Val(), err)
+				}
+				t.DialTimeout = caddy.Duration(dur)
+
+			case "read_timeout":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("bad timeout value %s: %v", d.Val(), err)
+				}
+				t.ReadTimeout = caddy.Duration(dur)
+
+			case "write_timeout":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(d.Val())
+				if err != nil {
+					return d.Errf("bad timeout value %s: %v", d.Val(), err)
+				}
+				t.WriteTimeout = caddy.Duration(dur)
+
 			default:
 				return d.Errf("unrecognized subdirective %s", d.Val())
 			}
@@ -126,6 +156,43 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					scgiTransport.EnvVars = make(map[string]string)
 				}
 				scgiTransport.EnvVars[args[0]] = args[1]
+
+			case "dial_timeout":
+				if !dispenser.NextArg() {
+					return nil, dispenser.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(dispenser.Val())
+				if err != nil {
+					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
+				}
+				fcgiTransport.DialTimeout = caddy.Duration(dur)
+				dispenser.Delete()
+				dispenser.Delete()
+
+			case "read_timeout":
+				if !dispenser.NextArg() {
+					return nil, dispenser.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(dispenser.Val())
+				if err != nil {
+					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
+				}
+				fcgiTransport.ReadTimeout = caddy.Duration(dur)
+				dispenser.Delete()
+				dispenser.Delete()
+
+			case "write_timeout":
+				if !dispenser.NextArg() {
+					return nil, dispenser.ArgErr()
+				}
+				dur, err := caddy.ParseDuration(dispenser.Val())
+				if err != nil {
+					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
+				}
+				fcgiTransport.WriteTimeout = caddy.Duration(dur)
+				dispenser.Delete()
+				dispenser.Delete()
+			}
 		}
 	}
 
