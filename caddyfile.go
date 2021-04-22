@@ -165,7 +165,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				if err != nil {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
-				sgiTransport.DialTimeout = caddy.Duration(dur)
+				scgiTransport.DialTimeout = caddy.Duration(dur)
 				dispenser.Delete()
 				dispenser.Delete()
 
