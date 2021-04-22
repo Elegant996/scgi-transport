@@ -32,8 +32,6 @@ func init() {
 // UnmarshalCaddyfile deserializes Caddyfile tokens into h.
 //
 //     transport scgi {
-//         root <path>
-//         split <at>
 //         env <key> <value>
 //     }
 //
@@ -41,18 +39,6 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch d.Val() {
-			case "root":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				t.Root = d.Val()
-
-			case "split":
-				t.SplitPath = d.RemainingArgs()
-				if len(t.SplitPath) == 0 {
-					return d.ArgErr()
-				}
-
 			case "env":
 				args := d.RemainingArgs()
 				if len(args) != 2 {
@@ -101,11 +87,9 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	if !h.Next() {
 		return nil, h.ArgErr()
 	}
-	
-	// route to actually reverse proxy requests to base URI path
-	rpMatcherSet := caddy.ModuleMap{
-		"path": h.JSON([]string{"/"}),
-	}
+
+	// set up the transport for SCGI
+	scgiTransport := Transport{}
 
 	// if the user specified a matcher token, use that
 	// matcher in a route that wraps both of our routes;
@@ -117,8 +101,40 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 		return nil, err
 	}
 
-	// set up the transport for SCGI
-	scgiTransport := Transport{EnvVars: map[string]string{"SCRIPT_NAME": "{http.request.uri.path}",}}
+	// make a new dispenser from the remaining tokens so that we
+	// can reset the dispenser back to this point for the
+	// reverse_proxy unmarshaler to read from it as well
+	dispenser := h.NewFromNextSegment()
+
+	// read the subdirectives that we allow as overrides to
+	// the scgi shortcut
+	// NOTE: we delete the tokens as we go so that the reverse_proxy
+	// unmarshal doesn't see these subdirectives which it cannot handle
+	for dispenser.Next() {
+		for dispenser.NextBlock(0) {
+			switch dispenser.Val() {
+			case "env":
+				args := dispenser.RemainingArgs()
+				dispenser.Delete()
+				for range args {
+					dispenser.Delete()
+				}
+				if len(args) != 2 {
+					return nil, dispenser.ArgErr()
+				}
+				if scgiTransport.EnvVars == nil {
+					scgiTransport.EnvVars = make(map[string]string)
+				}
+				scgiTransport.EnvVars[args[0]] = args[1]
+		}
+	}
+
+	// reset the dispenser after we're done so that the reverse_proxy
+	// unmarshaler can read it from the start
+	dispenser.Reset()
+
+	// set up a route list that we'll append to
+	routes := caddyhttp.RouteList{}
 
 	// create the reverse proxy handler which uses our SCGI transport
 	rpHandler := &reverseproxy.Handler{
@@ -141,7 +157,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	}
 
 	subroute := caddyhttp.Subroute{
-		Routes: caddyhttp.RouteList{rpRoute},
+		Routes: append(routes, rpRoute),
 	}
 
 	// the user's matcher is a prerequisite for ours, so
