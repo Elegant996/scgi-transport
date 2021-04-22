@@ -14,7 +14,7 @@
 
 // Copyright 2012 Junqing Tan <ivan@mysqlab.net> and The Go Authors
 // Use of this source code is governed by a BSD-style
-// Part of source code is based on Go fcgi package
+// Part of source code is based on Go scgi package
 
 package scgi
 
@@ -24,16 +24,20 @@ import (
 	"context"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/textproto"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// SCGIClient implements a FastCGI client, which is a standard for
+// SCGIClient implements a SCGI client, which is a standard for
 // interfacing external applications with Web servers.
 type SCGIClient struct {
 	conn      net.Conn
@@ -51,7 +55,7 @@ func DialWithDialerContext(ctx context.Context, network, address string, dialer 
 	}
 
 	scgi = &SCGIClient{
-		conn:      conn,
+		rwc:       conn,
 		keepAlive: false,
 	}
 
@@ -72,21 +76,21 @@ func Dial(network, address string) (scgi *SCGIClient, err error) {
 
 // Close closes scgi connection
 func (c *SCGIClient) Close() {
-	c.conn.Close()
+	c.rwc.Close()
 }
 
 // writeNetstring writes the netstring to the writer.
 func (c *SCGIClient) writeNetstring(content []byte) (err error) {
-	if _, err := c.conn.Write([]byte(strconv.Itoa(len(content)))); err != nil {
+	if _, err := c.rwc.Write([]byte(strconv.Itoa(len(content)))); err != nil {
 		return err
 	}
-	if _, err := c.conn.Write([]byte{':'}); err != nil {
+	if _, err := c.rwc.Write([]byte{':'}); err != nil {
 		return err
 	}
-	if _, err := c.conn.Write(content); err != nil {
+	if _, err := c.rwc.Write(content); err != nil {
 		return err
 	}
-	_, err = c.conn.Write([]byte{','})
+	_, err = c.rwc.Write([]byte{','})
 	return err
 }
 
@@ -137,10 +141,10 @@ func (c *SCGIClient) Do(p map[string]string, req io.Reader) (r io.Reader, err er
 	}
 
 	if req != nil {
-		_, _ = io.Copy(c.conn, req)
+		_, _ = io.Copy(c.rwc, req)
 	}
 
-	r = c.conn
+	r = c.rwc
 	return
 }
 
@@ -159,7 +163,7 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 	r, err := c.Do(p, req)
 	if err != nil {
 		return
-	}	
+	}
 
 	rb := bufio.NewReader(r)
 	tp := textproto.NewReader(rb)
@@ -248,20 +252,69 @@ func (c *SCGIClient) Post(p map[string]string, method string, bodyType string, b
 	return c.Request(p, body)
 }
 
+// PostForm issues a POST to the scgi responder, with form
+// as a string key to a list values (url.Values)
+func (c *SCGIClient) PostForm(p map[string]string, data url.Values) (resp *http.Response, err error) {
+	body := bytes.NewReader([]byte(data.Encode()))
+	return c.Post(p, "POST", "application/x-www-form-urlencoded", body, int64(body.Len()))
+}
+
+// PostFile issues a POST to the scgi responder in multipart(RFC 2046) standard,
+// with form as a string key to a list values (url.Values),
+// and/or with file as a string key to a list file path.
+func (c *SCGIClient) PostFile(p map[string]string, data url.Values, file map[string]string) (resp *http.Response, err error) {
+	buf := &bytes.Buffer{}
+	writer := multipart.NewWriter(buf)
+	bodyType := writer.FormDataContentType()
+
+	for key, val := range data {
+		for _, v0 := range val {
+			err = writer.WriteField(key, v0)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	for key, val := range file {
+		fd, e := os.Open(val)
+		if e != nil {
+			return nil, e
+		}
+		defer fd.Close()
+
+		part, e := writer.CreateFormFile(key, filepath.Base(val))
+		if e != nil {
+			return nil, e
+		}
+		_, err = io.Copy(part, fd)
+		if err != nil {
+			return
+		}
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return
+	}
+
+	return c.Post(p, "POST", bodyType, buf, int64(buf.Len()))
+}
+
 // SetReadTimeout sets the read timeout for future calls that read from the
-// fcgi responder. A zero value for t means no timeout will be set.
+// scgi responder. A zero value for t means no timeout will be set.
 func (c *SCGIClient) SetReadTimeout(t time.Duration) error {
-	if t != 0 {
-		return c.conn.SetReadDeadline(time.Now().Add(t))
+	if conn, ok := c.rwc.(net.Conn); ok && t != 0 {
+		return conn.SetReadDeadline(time.Now().Add(t))
 	}
 	return nil
 }
 
 // SetWriteTimeout sets the write timeout for future calls that send data to
-// the fcgi responder. A zero value for t means no timeout will be set.
+// the scgi responder. A zero value for t means no timeout will be set.
 func (c *SCGIClient) SetWriteTimeout(t time.Duration) error {
-	if t != 0 {
-		return c.conn.SetWriteDeadline(time.Now().Add(t))
+	if conn, ok := c.rwc.(net.Conn); ok && t != 0 {
+		return conn.SetWriteDeadline(time.Now().Add(t))
 	}
 	return nil
 }
