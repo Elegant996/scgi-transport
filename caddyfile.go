@@ -89,8 +89,7 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 
 // parseSCGI parses the scgi directive, which has the same syntax
 // as the reverse_proxy directive (in fact, the reverse_proxy's directive
-// Unmarshaler is invoked by this function) but the resulting proxy is specially
-// configured to define SCRIPT_NAME to match the URI path. A line such as this:
+// Unmarshaler is invoked by this function). A line such as this:
 //
 //     scgi localhost:7777
 //
@@ -98,7 +97,6 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 //
 //     reverse_proxy / localhost:7777 {
 //         transport scgi {
-//             env SCRIPT_NAME {http.request.uri.path}
 //         }
 //     }
 //
@@ -202,6 +200,13 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// set up a route list that we'll append to
 	routes := caddyhttp.RouteList{}
+	
+	// route to actually reverse proxy requests;
+	// empty by default
+	pathList := []string{}
+	rpMatcherSet := caddy.ModuleMap{
+		"path": h.JSON(pathList),
+	}
 
 	// create the reverse proxy handler which uses our SCGI transport
 	rpHandler := &reverseproxy.Handler{
@@ -219,7 +224,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// create the final reverse proxy route
 	rpRoute := caddyhttp.Route{
-		MatcherSetsRaw: []caddy.ModuleMap{},
+		MatcherSetsRaw: []caddy.ModuleMap{rpMatcherSet},
 		HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
 	}
 
