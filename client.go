@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -157,6 +158,8 @@ type clientCloser struct {
 
 func (s clientCloser) Close() error { return s.rwc.Close() }
 
+var statusRegex = regexp.MustCompile("(?i)(?:Status:|Http\\/[\\d\\.]+)\\s+(\\d{3}.*)")
+
 // Request returns a HTTP Response with Header and Body
 // from scgi responder
 func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Response, err error) {
@@ -169,6 +172,13 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 	tp := textproto.NewReader(rb)
 	resp = new(http.Response)
 
+	// Pull the response status
+	lineOne, err := tp.ReadContinuedLine()
+	if err != nil && err != io.EOF {
+		return
+	}
+	statusLine := statusRegex.FindStringSubmatch(lineOne)
+
 	// Parse the response headers.
 	mimeHeader, err := tp.ReadMIMEHeader()
 	if err != nil && err != io.EOF {
@@ -176,8 +186,8 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 	}
 	resp.Header = http.Header(mimeHeader)
 
-	if resp.Header.Get("Status") != "" {
-		statusParts := strings.SplitN(resp.Header.Get("Status"), " ", 2)
+	if len(statusLine) > 1 {
+		statusParts := strings.SplitN(statusLine[1], " ", 2)
 		resp.StatusCode, err = strconv.Atoi(statusParts[0])
 		if err != nil {
 			return
