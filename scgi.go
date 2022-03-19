@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -70,8 +69,8 @@ func (Transport) CaddyModule() caddy.ModuleInfo {
 func (t *Transport) Provision(ctx caddy.Context) error {
 	t.logger = ctx.Logger(t)
 
-	if t.Root == "" {
-		t.Root = "{http.vars.root}"
+	if t.root == "" {
+		t.root = "{http.vars.root}"
 	}
 
 	t.serverSoftware = "Caddy"
@@ -171,7 +170,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "]", "", 1)
 
 	// make sure file root is absolute
-	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
+	root, err := filepath.Abs(repl.ReplaceAll(t.root, "."))
 	if err != nil {
 		return nil, err
 	}
