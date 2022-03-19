@@ -201,7 +201,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	// it was changed by a middleware such as rewrite. By default, we pass the
 	// original URI in as the value of REQUEST_URI (the user can overwrite this if
 	// desired). This is how nginx defaults: http://stackoverflow.com/a/12485156/1048862
-	origReq := r.Context().Value(caddyhttp.OriginalRequestCtxKey).(http.Request)reqURL := origReq.URL
+	origReq := r.Context().Value(caddyhttp.OriginalRequestCtxKey).(http.Request)
 
 	requestScheme := "http"
 	if r.TLS != nil {
