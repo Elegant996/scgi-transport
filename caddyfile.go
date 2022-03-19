@@ -139,7 +139,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	// NOTE: we delete the tokens as we go so that the reverse_proxy
 	// unmarshal doesn't see these subdirectives which it cannot handle
 	for dispenser.Next() {
-		for dispenser.NextBlock(0) {
+		for dispenser.NextBlock(0) && dispenser.Nesting() == 1 {
 			switch dispenser.Val() {
 			case "env":
 				args := dispenser.RemainingArgs()
@@ -215,9 +215,11 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// the rest of the config is specified by the user
 	// using the reverse_proxy directive syntax
-	// TODO: this can overwrite our scgiTransport that we encoded and
-	// set on the rpHandler... even with a non-scgi transport!
-	err = rpHandler.UnmarshalCaddyfile(h.Dispenser)
+	err = rpHandler.UnmarshalCaddyfile(dispenser)
+	if err != nil {
+		return nil, err
+	}
+	err = rpHandler.FinalizeUnmarshalCaddyfile(h)
 	if err != nil {
 		return nil, err
 	}
