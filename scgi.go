@@ -164,34 +164,6 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "[", "", 1)
 	ip = strings.Replace(ip, "]", "", 1)
 
-<<<<<<< Updated upstream
-	// make sure file root is absolute
-	root, err := filepath.Abs(repl.ReplaceAll(t.root, "."))
-	if err != nil {
-		return nil, err
-	}
-
-	docURI := r.URL.Path
-	scriptName := r.URL.RequestURI()
-
-	// Try to grab the path remainder from a file matcher
-	// See https://github.com/caddyserver/caddy/issues/3718
-	var pathInfo string
-	if remainder, ok := repl.GetString("http.matchers.file.remainder"); ok {
-		pathInfo = remainder
-	}
-
-	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
-	scriptFilename := caddyhttp.SanitizedPathJoin(root, scriptName)
-
-	// Ensure the SCRIPT_NAME has a leading slash for compliance with RFC3875
-	// Info: https://tools.ietf.org/html/rfc3875#section-4.1.13
-	if scriptName != "" && !strings.HasPrefix(scriptName, "/") {
-		scriptName = "/" + scriptName
-	}
-
-=======
->>>>>>> Stashed changes
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the
 	// original URI in as the value of REQUEST_URI (the user can overwrite this if
