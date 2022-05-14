@@ -11,7 +11,7 @@ SCGI Directive
 To use the `scgi` directive, it must first be added under caddy's global setting:
 ```
 {
-  order   scgi after php_fastcgi
+  order   scgi after reverse_proxy
 }
 ```
 
