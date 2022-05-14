@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -208,12 +207,9 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"SERVER_SOFTWARE":   t.serverSoftware,
 
 		// Other variables
-		"DOCUMENT_ROOT":   root,
-		"DOCUMENT_URI":    "",
 		"HTTP_HOST":       r.Host, // added here, since not always part of headers
 		"REQUEST_URI":     origReq.URL.RequestURI(),
 		"SCGI":            "1", // Required
-		"SCRIPT_FILENAME": ".",
 		"SCRIPT_NAME":     "",
 	}
 
@@ -221,7 +217,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	// PATH_TRANSLATED should only exist if PATH_INFO is defined.
 	// Info: https://www.ietf.org/rfc/rfc3875 Page 14
 	if env["PATH_INFO"] != "" {
-		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin(root, r.URL.Path) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
+		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin("", r.URL.Path) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
 	}
 
 	// compliance with the CGI specification requires that
