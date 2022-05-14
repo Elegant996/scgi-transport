@@ -33,6 +33,9 @@ func init() {
 //
 //     transport scgi {
 //         env <key> <value>
+//         dial_timeout <duration>
+//         read_timeout <duration>
+//         write_timeout <duration>
 //     }
 //
 func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
