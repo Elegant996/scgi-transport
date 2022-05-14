@@ -227,7 +227,6 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// create the final reverse proxy route
 	rpRoute := caddyhttp.Route{
-		MatcherSetsRaw: []caddy.ModuleMap{},
 		HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
 	}
 
