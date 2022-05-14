@@ -52,7 +52,6 @@ type Transport struct {
 	// The duration used to set a deadline when sending to the SCGI server.
 	WriteTimeout caddy.Duration `json:"write_timeout,omitempty"`
 
-	root           string
 	serverSoftware string
 	logger         *zap.Logger
 }
@@ -68,10 +67,6 @@ func (Transport) CaddyModule() caddy.ModuleInfo {
 // Provision sets up t.
 func (t *Transport) Provision(ctx caddy.Context) error {
 	t.logger = ctx.Logger(t)
-
-	if t.root == "" {
-		t.root = "{http.vars.root}"
-	}
 
 	t.serverSoftware = "Caddy"
 	if mod := caddy.GoModule(); mod.Version != "" {
@@ -169,16 +164,15 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "[", "", 1)
 	ip = strings.Replace(ip, "]", "", 1)
 
+<<<<<<< Updated upstream
 	// make sure file root is absolute
 	root, err := filepath.Abs(repl.ReplaceAll(t.root, "."))
 	if err != nil {
 		return nil, err
 	}
 
-	fpath := r.URL.Path
-	scriptName := fpath
-
-	docURI := fpath
+	docURI := r.URL.Path
+	scriptName := r.URL.RequestURI()
 
 	// Try to grab the path remainder from a file matcher
 	// See https://github.com/caddyserver/caddy/issues/3718
@@ -196,6 +190,8 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		scriptName = "/" + scriptName
 	}
 
+=======
+>>>>>>> Stashed changes
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the
 	// original URI in as the value of REQUEST_URI (the user can overwrite this if
@@ -226,7 +222,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"CONTENT_LENGTH":    r.Header.Get("Content-Length"),
 		"CONTENT_TYPE":      r.Header.Get("Content-Type"),
 		"GATEWAY_INTERFACE": "CGI/1.1",
-		"PATH_INFO":         pathInfo,
+		"PATH_INFO":         r.URL.Path,
 		"QUERY_STRING":      r.URL.RawQuery,
 		"REMOTE_ADDR":       ip,
 		"REMOTE_HOST":       ip, // For speed, remote host lookups disabled
@@ -241,19 +237,19 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 
 		// Other variables
 		"DOCUMENT_ROOT":   root,
-		"DOCUMENT_URI":    docURI,
+		"DOCUMENT_URI":    "",
 		"HTTP_HOST":       r.Host, // added here, since not always part of headers
 		"REQUEST_URI":     origReq.URL.RequestURI(),
 		"SCGI":            "1", // Required
-		"SCRIPT_FILENAME": scriptFilename,
-		"SCRIPT_NAME":     scriptName,
+		"SCRIPT_FILENAME": ".",
+		"SCRIPT_NAME":     "",
 	}
 
 	// compliance with the CGI specification requires that
 	// PATH_TRANSLATED should only exist if PATH_INFO is defined.
 	// Info: https://www.ietf.org/rfc/rfc3875 Page 14
 	if env["PATH_INFO"] != "" {
-		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin(root, pathInfo) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
+		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin(root, r.URL.Path) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
 	}
 
 	// compliance with the CGI specification requires that
