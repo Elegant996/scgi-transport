@@ -207,6 +207,8 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"SERVER_SOFTWARE":   t.serverSoftware,
 
 		// Other variables
+		"DOCUMENT_ROOT":   "",
+		"DOCUMENT_URI":    "",
 		"HTTP_HOST":       r.Host, // added here, since not always part of headers
 		"REQUEST_URI":     origReq.URL.RequestURI(),
 		"SCGI":            "1", // Required
