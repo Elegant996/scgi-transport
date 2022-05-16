@@ -122,10 +122,6 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	// set up the transport for SCGI
 	scgiTransport := Transport{}
 
-	// set up the SCRIPT_NAME variable as we do not normally
-	// pass it via SCGI
-	scgiTransport.EnvVars = map[string]string{"SCRIPT_NAME": "{header.SCRIPT_NAME}"}
-
 	// if the user specified a matcher token, use that
 	// matcher in a route that wraps both of our routes;
 	// either way, strip the matcher token and pass
