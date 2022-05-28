@@ -185,6 +185,14 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		authUser = val.(string)
 	}
 
+	// We don't need a SCRIPT_NAME but if we have one, strip it from PATH_INFO
+	var pathInfo string
+	if val, ok := t.EnvVars["SCRIPT_NAME"]; ok {
+		pathInfo = strings.TrimPrefix(r.URL.Path, val)
+	} else {
+		pathInfo = r.URL.Path
+	}
+
 	// Some variables are unused but cleared explicitly to prevent
 	// the parent environment from interfering.
 	env = envVars{
@@ -193,7 +201,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"CONTENT_LENGTH":    r.Header.Get("Content-Length"),
 		"CONTENT_TYPE":      r.Header.Get("Content-Type"),
 		"GATEWAY_INTERFACE": "CGI/1.1",
-		"PATH_INFO":         r.URL.Path,
+		"PATH_INFO":         pathInfo,
 		"QUERY_STRING":      r.URL.RawQuery,
 		"REMOTE_ADDR":       ip,
 		"REMOTE_HOST":       ip, // For speed, remote host lookups disabled
@@ -207,12 +215,12 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"SERVER_SOFTWARE":   t.serverSoftware,
 
 		// Other variables
-		"DOCUMENT_ROOT":   "",
-		"DOCUMENT_URI":    "",
-		"HTTP_HOST":       r.Host, // added here, since not always part of headers
-		"REQUEST_URI":     origReq.URL.RequestURI(),
-		"SCGI":            "1", // Required
-		"SCRIPT_NAME":     "",
+		"DOCUMENT_ROOT": "",
+		"DOCUMENT_URI":  "",
+		"HTTP_HOST":     r.Host, // added here, since not always part of headers
+		"REQUEST_URI":   origReq.URL.RequestURI(),
+		"SCGI":          "1", // Required
+		"SCRIPT_NAME":   "",
 	}
 
 	// compliance with the CGI specification requires that
