@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,24 @@ func init() {
 
 // Transport facilitates SCGI communication.
 type Transport struct {
+	// Use this directory as the fastcgi root directory. Defaults to the root
+	// directory of the parent virtual host.
+	Root string `json:"root,omitempty"`
+
+	// The path in the URL will be split into two, with the first piece ending
+	// with the value of SplitPath. The first piece will be assumed as the
+	// actual resource (CGI script) name, and the second piece will be set to
+	// PATH_INFO for the CGI script to use.
+	//
+	// Future enhancements should be careful to avoid CVE-2019-11043,
+	// which can be mitigated with use of a try_files-like behavior
+	// that 404s if the fastcgi path info is not found.
+	SplitPath []string `json:"split_path,omitempty"`
+
+	// Path declared as root directory will be resolved to its absolute value
+	// after the evaluation of any symbolic links.
+	ResolveRootSymlink bool `json:"resolve_root_symlink,omitempty"`
+
 	// Extra environment variables.
 	EnvVars map[string]string `json:"env,omitempty"`
 
@@ -66,6 +85,10 @@ func (Transport) CaddyModule() caddy.ModuleInfo {
 // Provision sets up t.
 func (t *Transport) Provision(ctx caddy.Context) error {
 	t.logger = ctx.Logger(t)
+
+	if t.Root == "" {
+		t.Root = "{http.vars.root}"
+	}
 
 	t.serverSoftware = "Caddy"
 	if mod := caddy.GoModule(); mod.Version != "" {
@@ -163,6 +186,51 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "[", "", 1)
 	ip = strings.Replace(ip, "]", "", 1)
 
+	// make sure file root is absolute
+	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
+	if err != nil {
+		return nil, err
+	}
+
+	if t.ResolveRootSymlink {
+		root, err = filepath.EvalSymlinks(root)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	fpath := r.URL.Path
+	scriptName := fpath
+
+	docURI := fpath
+	// split "actual path" from "path info" if configured
+	var pathInfo string
+	if splitPos := t.splitPos(fpath); splitPos > -1 {
+		docURI = fpath[:splitPos]
+		pathInfo = fpath[splitPos:]
+
+		// Strip PATH_INFO from SCRIPT_NAME
+		scriptName = strings.TrimSuffix(scriptName, pathInfo)
+	}
+
+	// Try to grab the path remainder from a file matcher
+	// if we didn't get a split result here.
+	// See https://github.com/caddyserver/caddy/issues/3718
+	if pathInfo == "" {
+		if remainder, ok := repl.GetString("http.matchers.file.remainder"); ok {
+			pathInfo = remainder
+		}
+	}
+
+	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
+	scriptFilename := caddyhttp.SanitizedPathJoin(root, scriptName)
+
+	// Ensure the SCRIPT_NAME has a leading slash for compliance with RFC3875
+	// Info: https://tools.ietf.org/html/rfc3875#section-4.1.13
+	if scriptName != "" && !strings.HasPrefix(scriptName, "/") {
+		scriptName = "/" + scriptName
+	}
+
 	// Get the request URL from context. The context stores the original URL in case
 	// it was changed by a middleware such as rewrite. By default, we pass the
 	// original URI in as the value of REQUEST_URI (the user can overwrite this if
@@ -193,7 +261,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"CONTENT_LENGTH":    r.Header.Get("Content-Length"),
 		"CONTENT_TYPE":      r.Header.Get("Content-Type"),
 		"GATEWAY_INTERFACE": "CGI/1.1",
-		"PATH_INFO":         r.URL.Path,
+		"PATH_INFO":         pathInfo,
 		"QUERY_STRING":      r.URL.RawQuery,
 		"REMOTE_ADDR":       ip,
 		"REMOTE_HOST":       ip, // For speed, remote host lookups disabled
@@ -207,19 +275,20 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		"SERVER_SOFTWARE":   t.serverSoftware,
 
 		// Other variables
-		"DOCUMENT_ROOT":   "",
-		"DOCUMENT_URI":    "",
+		"DOCUMENT_ROOT":   root,
+		"DOCUMENT_URI":    docURI,
 		"HTTP_HOST":       r.Host, // added here, since not always part of headers
 		"REQUEST_URI":     origReq.URL.RequestURI(),
 		"SCGI":            "1", // Required
-		"SCRIPT_NAME":     "",
+		"SCRIPT_FILENAME": scriptFilename,
+		"SCRIPT_NAME":     scriptName,
 	}
 
 	// compliance with the CGI specification requires that
 	// PATH_TRANSLATED should only exist if PATH_INFO is defined.
 	// Info: https://www.ietf.org/rfc/rfc3875 Page 14
 	if env["PATH_INFO"] != "" {
-		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin("", r.URL.Path) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
+		env["PATH_TRANSLATED"] = caddyhttp.SanitizedPathJoin(root, pathInfo) // Info: http://www.oreilly.com/openbook/cgi/ch02_04.html
 	}
 
 	// compliance with the CGI specification requires that
@@ -264,6 +333,26 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		env["HTTP_"+header] = strings.Join(val, ", ")
 	}
 	return env, nil
+}
+
+// splitPos returns the index where path should
+// be split based on t.SplitPath.
+func (t Transport) splitPos(path string) int {
+	// TODO: from v1...
+	// if httpserver.CaseSensitivePath {
+	// 	return strings.Index(path, r.SplitPath)
+	// }
+	if len(t.SplitPath) == 0 {
+		return 0
+	}
+
+	lowerPath := strings.ToLower(path)
+	for _, split := range t.SplitPath {
+		if idx := strings.Index(lowerPath, strings.ToLower(split)); idx > -1 {
+			return idx + len(split)
+		}
+	}
+	return -1
 }
 
 // envVars is a simple type to allow for speeding up zap log encoding.
