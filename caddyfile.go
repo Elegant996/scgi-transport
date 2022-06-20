@@ -32,7 +32,10 @@ func init() {
 // UnmarshalCaddyfile deserializes Caddyfile tokens into h.
 //
 //     transport scgi {
+//         root <path>
+//         split <at>
 //         env <key> <value>
+//         resolve_root_symlink
 //         dial_timeout <duration>
 //         read_timeout <duration>
 //         write_timeout <duration>
@@ -42,6 +45,18 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
 		for d.NextBlock(0) {
 			switch d.Val() {
+			case "root":
+				if !d.NextArg() {
+					return d.ArgErr()
+				}
+				t.Root = d.Val()
+
+			case "split":
+				t.SplitPath = d.RemainingArgs()
+				if len(t.SplitPath) == 0 {
+					return d.ArgErr()
+				}
+
 			case "env":
 				args := d.RemainingArgs()
 				if len(args) != 2 {
@@ -51,6 +66,12 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					t.EnvVars = make(map[string]string)
 				}
 				t.EnvVars[args[0]] = args[1]
+
+			case "resolve_root_symlink":
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				t.ResolveRootSymlink = true
 
 			case "dial_timeout":
 				if !d.NextArg() {
@@ -152,6 +173,24 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 			// parse the scgi subdirectives
 			switch dispenser.Val() {
+			case "root":
+				if !dispenser.NextArg() {
+					return nil, dispenser.ArgErr()
+				}
+				scgiTransport.Root = dispenser.Val()
+				dispenser.Delete()
+				dispenser.Delete()
+
+			case "split":
+				extensions = dispenser.RemainingArgs()
+				dispenser.Delete()
+				for range extensions {
+					dispenser.Delete()
+				}
+				if len(extensions) == 0 {
+					return nil, dispenser.ArgErr()
+				}
+
 			case "env":
 				args := dispenser.RemainingArgs()
 				dispenser.Delete()
@@ -165,6 +204,14 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					scgiTransport.EnvVars = make(map[string]string)
 				}
 				scgiTransport.EnvVars[args[0]] = args[1]
+
+			case "resolve_root_symlink":
+				args := dispenser.RemainingArgs()
+				dispenser.Delete()
+				for range args {
+					dispenser.Delete()
+				}
+				scgiTransport.ResolveRootSymlink = true
 
 			case "dial_timeout":
 				if !dispenser.NextArg() {
