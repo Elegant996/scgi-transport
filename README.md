@@ -18,7 +18,10 @@ To use the `scgi` directive, it must first be added under caddy's global setting
 ### Syntax ###
 ```
 scgi [<matcher>] <gateways...> {
+  root <path>
+  split <substrings...>
 	env [<key> <value>]
+  resolve_root_symlink
 	dial_timeout  <duration>
 	read_timeout  <duration>
 	write_timeout <duration>
