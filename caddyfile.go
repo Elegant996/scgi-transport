@@ -182,14 +182,15 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				dispenser.Delete()
 
 			case "split":
-				extensions = dispenser.RemainingArgs()
+				args := dispenser.RemainingArgs()
 				dispenser.Delete()
-				for range extensions {
+				for range args {
 					dispenser.Delete()
 				}
-				if len(extensions) == 0 {
+				if len(args) == 0 {
 					return nil, dispenser.ArgErr()
 				}
+				scgiTransport.SplitPath = args
 
 			case "env":
 				args := dispenser.RemainingArgs()
