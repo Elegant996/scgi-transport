@@ -220,6 +220,12 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 		if remainder, ok := repl.GetString("http.matchers.file.remainder"); ok {
 			pathInfo = remainder
 		}
+	} else {
+		// Ensure the PATH_INFO has a leading slash for compliance with RFC3875
+		// Info: https://tools.ietf.org/html/rfc3875#section-4.1.5
+		if !strings.HasPrefix(pathInfo, "/") {
+			pathInfo = "/" + pathInfo
+		}
 	}
 
 	// SCRIPT_FILENAME is the absolute path of SCRIPT_NAME
