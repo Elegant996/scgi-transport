@@ -205,7 +205,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	docURI := fpath
 	// split "actual path" from "path info" if configured
 	var pathInfo string
-	if splitPos := t.splitPos(fpath); splitPos > -1 {
+	if splitPos := t.splitPos(fpath); splitPos > 0 {
 		docURI = fpath[:splitPos]
 		pathInfo = fpath[splitPos:]
 
