@@ -191,7 +191,7 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 
 	} else {
 		// Pull the response status.
-		lineOne, err = tp.ReadContinuedLine()
+		lineOne, err := tp.ReadContinuedLine()
 		if err != nil && err != io.EOF {
 			return
 		}
