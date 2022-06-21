@@ -195,7 +195,7 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 		if err != nil && err != io.EOF {
 			return
 		}
-		statusLine := statusRegex.FindStringSubmatch(lineOne)
+		statusLine := StatusRegex.FindStringSubmatch(lineOne)
 
 		if len(statusLine) > 1 {
 			statusParts := strings.SplitN(statusLine[1], " ", 2)
