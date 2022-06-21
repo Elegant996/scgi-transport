@@ -31,10 +31,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// StatusRegex describes the pattern for a raw HTTP Response code.
+var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3}.*)")
 
 // SCGIClient implements a SCGI client, which is a standard for
 // interfacing external applications with Web servers.
@@ -186,7 +190,26 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 		}
 
 	} else {
-		resp.StatusCode = http.StatusOK
+		// Pull the response status.
+		lineOne, err = tp.ReadContinuedLine()
+		if err != nil && err != io.EOF {
+			return
+		}
+		statusLine := statusRegex.FindStringSubmatch(lineOne)
+
+		if len(statusLine) > 1 {
+			statusParts := strings.SplitN(statusLine[1], " ", 2)
+			resp.StatusCode, err = strconv.Atoi(statusParts[0])
+			if err != nil {
+				return
+			}
+			if len(statusParts) > 1 {
+				resp.Status = statusParts[1]
+			}
+
+		} else {
+			resp.StatusCode = http.StatusOK
+		}
 	}
 
 	// TODO: fixTransferEncoding ?
