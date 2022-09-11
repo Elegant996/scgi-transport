@@ -46,6 +46,7 @@ var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3
 // interfacing external applications with Web servers.
 type SCGIClient struct {
 	rwc       io.ReadWriteCloser
+	stderr    bytes.Buffer
 	keepAlive bool
 	logger    *zap.Logger
 }
@@ -175,7 +176,7 @@ func (s clientCloser) Close() error {
 	} else {
 		s.logger.Warn("stderr", zap.ByteString("body", stderr))
 	}
-	return f.SCGIClient.rwc.Close()
+	return s.SCGIClient.rwc.Close()
 }
 
 // Request returns a HTTP Response with Header and Body
