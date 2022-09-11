@@ -34,13 +34,15 @@ import (
 	"github.com/caddyserver/caddy/v2"
 )
 
+var noopLogger = zap.NewNop()
+
 func init() {
 	caddy.RegisterModule(Transport{})
 }
 
 // Transport facilitates SCGI communication.
 type Transport struct {
-	// Use this directory as the fastcgi root directory. Defaults to the root
+	// Use this directory as the scgi root directory. Defaults to the root
 	// directory of the parent virtual host.
 	Root string `json:"root,omitempty"`
 
@@ -51,7 +53,7 @@ type Transport struct {
 	//
 	// Future enhancements should be careful to avoid CVE-2019-11043,
 	// which can be mitigated with use of a try_files-like behavior
-	// that 404s if the fastcgi path info is not found.
+	// that 404s if the scgi path info is not found.
 	SplitPath []string `json:"split_path,omitempty"`
 
 	// Path declared as root directory will be resolved to its absolute value
@@ -69,6 +71,11 @@ type Transport struct {
 
 	// The duration used to set a deadline when sending to the SCGI server.
 	WriteTimeout caddy.Duration `json:"write_timeout,omitempty"`
+
+	// Capture and log any messages sent by the upstream on stderr. Logs at WARN
+	// level by default. If the response has a 4xx or 5xx status ERROR level will
+	// be used instead.
+	CaptureStderr bool `json:"capture_stderr,omitempty"`
 
 	serverSoftware string
 	logger         *zap.Logger
@@ -106,6 +113,8 @@ func (t *Transport) Provision(ctx caddy.Context) error {
 
 // RoundTrip implements http.RoundTripper.
 func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
+	server := r.Context().Value(caddyhttp.ServerCtxKey).(*caddyhttp.Server)
+
 	env, err := t.buildEnv(r)
 	if err != nil {
 		return nil, fmt.Errorf("building environment: %v", err)
@@ -126,16 +135,30 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		address = dialInfo.Address
 	}
 
+	logCreds := server.Logs != nil && server.Logs.ShouldLogCredentials
+	loggableReq := caddyhttp.LoggableHTTPRequest{
+		Request:              r,
+		ShouldLogCredentials: logCreds,
+	}
+	loggableEnv := loggableEnv{vars: env, logCredentials: logCreds}
 	t.logger.Debug("roundtrip",
-		zap.Object("request", caddyhttp.LoggableHTTPRequest{Request: r}),
+		zap.Object("request", loggableReq),
 		zap.String("dial", address),
-		zap.Object("env", env),
+		zap.Object("env", loggableEnv),
 	)
 
 	scgiBackend, err := DialContext(ctx, network, address)
 	if err != nil {
 		// TODO: wrap in a special error type if the dial failed, so retries can happen if enabled
 		return nil, fmt.Errorf("dialing backend: %v", err)
+	}
+	if t.CaptureStderr {
+		scgiBackend.logger = t.logger.With(
+			zap.Object("request", loggableReq),
+			zap.Object("env", loggableEnv),
+		)
+	} else {
+		scgiBackend.logger = noopLogger
 	}
 	// scgiBackend gets closed when response body is closed (see clientCloser)
 
@@ -364,8 +387,20 @@ func (t Transport) splitPos(path string) int {
 // envVars is a simple type to allow for speeding up zap log encoding.
 type envVars map[string]string
 
-func (env envVars) MarshalLogObject(enc zapcore.ObjectEncoder) error {
-	for k, v := range env {
+// loggableEnv is a simple type to allow for speeding up zap log encoding.
+type loggableEnv struct {
+	vars           envVars
+	logCredentials bool
+}
+
+func (env loggableEnv) MarshalLogObject(enc zapcore.ObjectEncoder) error {
+	for k, v := range env.vars {
+		if !env.logCredentials {
+			switch strings.ToLower(k) {
+			case "http_cookie", "http_set_cookie", "http_authorization", "http_proxy_authorization":
+				v = ""
+			}
+		}
 		enc.AddString(k, v)
 	}
 	return nil
@@ -384,7 +419,7 @@ var headerNameReplacer = strings.NewReplacer(" ", "_", "-", "_")
 
 // Interface guards
 var (
-	_ zapcore.ObjectMarshaler = (*envVars)(nil)
+	_ zapcore.ObjectMarshaler = (*loggableEnv)(nil)
 
 	_ caddy.Provisioner = (*Transport)(nil)
 	_ http.RoundTripper = (*Transport)(nil)

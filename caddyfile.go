@@ -31,15 +31,16 @@ func init() {
 
 // UnmarshalCaddyfile deserializes Caddyfile tokens into h.
 //
-//     transport scgi {
-//         root <path>
-//         split <at>
-//         env <key> <value>
-//         resolve_root_symlink
-//         dial_timeout <duration>
-//         read_timeout <duration>
-//         write_timeout <duration>
-//     }
+//	transport scgi {
+//	    root <path>
+//	    split <at>
+//	    env <key> <value>
+//	    resolve_root_symlink
+//	    dial_timeout <duration>
+//	    read_timeout <duration>
+//	    write_timeout <duration>
+//	    capture_stderr
+//	}
 //
 func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	for d.Next() {
@@ -103,6 +104,12 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				t.WriteTimeout = caddy.Duration(dur)
 
+			case "capture_stderr":
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				t.CaptureStderr = true
+
 			default:
 				return d.Errf("unrecognized subdirective %s", d.Val())
 			}
@@ -115,14 +122,14 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 // as the reverse_proxy directive (in fact, the reverse_proxy's directive
 // Unmarshaler is invoked by this function). A line such as this:
 //
-//     scgi localhost:7777
+//	scgi localhost:7777
 //
 // is equivalent to a route consisting of:
 //
-//     reverse_proxy / localhost:7777 {
-//         transport scgi {
-//         }
-//     }
+//	reverse_proxy / localhost:7777 {
+//		transport scgi {
+//		}
+//	}
 //
 // If this "common" config is not compatible with a user's requirements,
 // they can use a manual approach based on the example above to configure
@@ -130,7 +137,7 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 //
 // If a matcher is specified by the user, for example:
 //
-//     scgi /subpath localhost:7777
+//	scgi /subpath localhost:7777
 //
 // then the resulting handlers are wrapped in a subroute that uses the
 // user's matcher as a prerequisite to enter the subroute. In other
@@ -249,6 +256,14 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				scgiTransport.WriteTimeout = caddy.Duration(dur)
 				dispenser.Delete()
 				dispenser.Delete()
+
+			case "capture_stderr":
+				args := dispenser.RemainingArgs()
+				dispenser.Delete()
+				for range args {
+					dispenser.Delete()
+				}
+				scgiTransport.CaptureStderr = true
 			}
 		}
 	}

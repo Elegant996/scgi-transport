@@ -35,6 +35,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // StatusRegex describes the pattern for a raw HTTP Response code.
@@ -45,6 +47,7 @@ var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3
 type SCGIClient struct {
 	rwc       io.ReadWriteCloser
 	keepAlive bool
+	logger    *zap.Logger
 }
 
 // DialWithDialerContext connects to the scgi responder at the specified network address, using custom net.Dialer
@@ -78,27 +81,27 @@ func Dial(network, address string) (scgi *SCGIClient, err error) {
 }
 
 // Close closes scgi connection
-func (c *SCGIClient) Close() {
-	c.rwc.Close()
+func (s *SCGIClient) Close() {
+	s.rwc.Close()
 }
 
 // writeNetstring writes the netstring to the writer.
-func (c *SCGIClient) writeNetstring(content []byte) (err error) {
-	if _, err := c.rwc.Write([]byte(strconv.Itoa(len(content)))); err != nil {
+func (s *SCGIClient) writeNetstring(content []byte) (err error) {
+	if _, err := s.rwc.Write([]byte(strconv.Itoa(len(content)))); err != nil {
 		return err
 	}
-	if _, err := c.rwc.Write([]byte{':'}); err != nil {
+	if _, err := s.rwc.Write([]byte{':'}); err != nil {
 		return err
 	}
-	if _, err := c.rwc.Write(content); err != nil {
+	if _, err := s.rwc.Write(content); err != nil {
 		return err
 	}
-	_, err = c.rwc.Write([]byte{','})
+	_, err = s.rwc.Write([]byte{','})
 	return err
 }
 
 // writePairs writes all headers to the buffer. SCGI requires CONTENT_LENGTH as the first header.
-func (c *SCGIClient) writePairs(pairs map[string]string) error {
+func (s *SCGIClient) writePairs(pairs map[string]string) error {
 	b := &bytes.Buffer{}
 	var k string = "CONTENT_LENGTH"
 	if v, ok := pairs[k]; ok {
@@ -132,22 +135,22 @@ func (c *SCGIClient) writePairs(pairs map[string]string) error {
 			return err
 		}
 	}
-	return c.writeNetstring(b.Bytes())
+	return s.writeNetstring(b.Bytes())
 }
 
 // Do made the request and returns a io.Reader that translates the data read
 // from scgi responder out of scgi packet before returning it.
-func (c *SCGIClient) Do(p map[string]string, req io.Reader) (r io.Reader, err error) {
-	err = c.writePairs(p)
+func (s *SCGIClient) Do(p map[string]string, req io.Reader) (r io.Reader, err error) {
+	err = s.writePairs(p)
 	if err != nil {
 		return
 	}
 
 	if req != nil {
-		_, _ = io.Copy(c.rwc, req)
+		_, _ = io.Copy(s.rwc, req)
 	}
 
-	r = c.rwc
+	r = s.rwc
 	return
 }
 
@@ -156,14 +159,29 @@ func (c *SCGIClient) Do(p map[string]string, req io.Reader) (r io.Reader, err er
 type clientCloser struct {
 	*SCGIClient
 	io.Reader
+
+	status int
+	logger *zap.Logger
 }
 
-func (s clientCloser) Close() error { return s.rwc.Close() }
+func (s clientCloser) Close() error {
+	stderr := s.SCGIClient.stderr.Bytes()
+	if len(stderr) == 0 {
+		return s.SCGIClient.rwc.Close()
+	}
+
+	if s.status >= 400 {
+		s.logger.Error("stderr", zap.ByteString("body", stderr))
+	} else {
+		s.logger.Warn("stderr", zap.ByteString("body", stderr))
+	}
+	return f.SCGIClient.rwc.Close()
+}
 
 // Request returns a HTTP Response with Header and Body
 // from scgi responder
-func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Response, err error) {
-	r, err := c.Do(p, req)
+func (s *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Response, err error) {
+	r, err := s.Do(p, req)
 	if err != nil {
 		return
 	}
@@ -218,43 +236,53 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 	resp.ContentLength, _ = strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 
 	if chunked(resp.TransferEncoding) {
-		resp.Body = clientCloser{c, httputil.NewChunkedReader(rb)}
+		resp.Body = clientCloser{
+			SCGIClient: s,
+			Reader:     httputil.NewChunkedReader(rb),
+			status:     resp.StatusCode,
+			logger:     s.logger,
+		}
 	} else {
-		resp.Body = clientCloser{c, io.NopCloser(rb)}
+		resp.Body = clientCloser{
+			SCGIClient: s,
+			Reader:     rb,
+			status:     resp.StatusCode,
+			logger:     s.logger,
+		}
 	}
 	return
 }
 
 // Get issues a GET request to the scgi responder.
-func (c *SCGIClient) Get(p map[string]string, body io.Reader, l int64) (resp *http.Response, err error) {
+func (s *SCGIClient) Get(p map[string]string, body io.Reader, l int64) (resp *http.Response, err error) {
 
 	p["REQUEST_METHOD"] = "GET"
 	p["CONTENT_LENGTH"] = strconv.FormatInt(l, 10)
 
-	return c.Request(p, body)
+	return s.Request(p, body)
 }
 
 // Head issues a HEAD request to the scgi responder.
-func (c *SCGIClient) Head(p map[string]string) (resp *http.Response, err error) {
+func (s *SCGIClient) Head(p map[string]string) (resp *http.Response, err error) {
 
 	p["REQUEST_METHOD"] = "HEAD"
 	p["CONTENT_LENGTH"] = "0"
 
-	return c.Request(p, nil)
+	return s.Request(p, nil)
 }
 
 // Options issues an OPTIONS request to the scgi responder.
-func (c *SCGIClient) Options(p map[string]string) (resp *http.Response, err error) {
+func (s *SCGIClient) Options(p map[string]string) (resp *http.Response, err error) {
 
 	p["REQUEST_METHOD"] = "OPTIONS"
 	p["CONTENT_LENGTH"] = "0"
 
-	return c.Request(p, nil)
+	return s.Request(p, nil)
 }
 
 // Post issues a POST request to the scgi responder. with request body
 // in the format that bodyType specified
-func (c *SCGIClient) Post(p map[string]string, method string, bodyType string, body io.Reader, l int64) (resp *http.Response, err error) {
+func (s *SCGIClient) Post(p map[string]string, method string, bodyType string, body io.Reader, l int64) (resp *http.Response, err error) {
 	if p == nil {
 		p = make(map[string]string)
 	}
@@ -272,20 +300,20 @@ func (c *SCGIClient) Post(p map[string]string, method string, bodyType string, b
 		p["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
 	}
 
-	return c.Request(p, body)
+	return s.Request(p, body)
 }
 
 // PostForm issues a POST to the scgi responder, with form
 // as a string key to a list values (url.Values)
-func (c *SCGIClient) PostForm(p map[string]string, data url.Values) (resp *http.Response, err error) {
+func (s *SCGIClient) PostForm(p map[string]string, data url.Values) (resp *http.Response, err error) {
 	body := bytes.NewReader([]byte(data.Encode()))
-	return c.Post(p, "POST", "application/x-www-form-urlencoded", body, int64(body.Len()))
+	return s.Post(p, "POST", "application/x-www-form-urlencoded", body, int64(body.Len()))
 }
 
 // PostFile issues a POST to the scgi responder in multipart(RFC 2046) standard,
 // with form as a string key to a list values (url.Values),
 // and/or with file as a string key to a list file path.
-func (c *SCGIClient) PostFile(p map[string]string, data url.Values, file map[string]string) (resp *http.Response, err error) {
+func (s *SCGIClient) PostFile(p map[string]string, data url.Values, file map[string]string) (resp *http.Response, err error) {
 	buf := &bytes.Buffer{}
 	writer := multipart.NewWriter(buf)
 	bodyType := writer.FormDataContentType()
@@ -321,13 +349,13 @@ func (c *SCGIClient) PostFile(p map[string]string, data url.Values, file map[str
 		return
 	}
 
-	return c.Post(p, "POST", bodyType, buf, int64(buf.Len()))
+	return s.Post(p, "POST", bodyType, buf, int64(buf.Len()))
 }
 
 // SetReadTimeout sets the read timeout for future calls that read from the
 // scgi responder. A zero value for t means no timeout will be set.
-func (c *SCGIClient) SetReadTimeout(t time.Duration) error {
-	if conn, ok := c.rwc.(net.Conn); ok && t != 0 {
+func (s *SCGIClient) SetReadTimeout(t time.Duration) error {
+	if conn, ok := s.rwc.(net.Conn); ok && t != 0 {
 		return conn.SetReadDeadline(time.Now().Add(t))
 	}
 	return nil
@@ -335,8 +363,8 @@ func (c *SCGIClient) SetReadTimeout(t time.Duration) error {
 
 // SetWriteTimeout sets the write timeout for future calls that send data to
 // the scgi responder. A zero value for t means no timeout will be set.
-func (c *SCGIClient) SetWriteTimeout(t time.Duration) error {
-	if conn, ok := c.rwc.(net.Conn); ok && t != 0 {
+func (s *SCGIClient) SetWriteTimeout(t time.Duration) error {
+	if conn, ok := s.rwc.(net.Conn); ok && t != 0 {
 		return conn.SetWriteDeadline(time.Now().Add(t))
 	}
 	return nil
