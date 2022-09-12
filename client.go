@@ -165,7 +165,7 @@ type clientCloser struct {
 	logger *zap.Logger
 }
 
-func (s clientCloser) Close() error {
+func (c clientCloser) Close() error {
 	stderr := c.SCGIClient.stderr.Bytes()
 	if len(stderr) == 0 {
 		return c.SCGIClient.rwc.Close()
@@ -238,14 +238,14 @@ func (c *SCGIClient) Request(p map[string]string, req io.Reader) (resp *http.Res
 
 	if chunked(resp.TransferEncoding) {
 		resp.Body = clientCloser{
-			SCGIClient: s,
+			SCGIClient: c,
 			Reader:     httputil.NewChunkedReader(rb),
 			status:     resp.StatusCode,
 			logger:     c.logger,
 		}
 	} else {
 		resp.Body = clientCloser{
-			SCGIClient: s,
+			SCGIClient: c,
 			Reader:     rb,
 			status:     resp.StatusCode,
 			logger:     c.logger,
