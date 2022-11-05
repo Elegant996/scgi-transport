@@ -15,7 +15,6 @@
 package scgi
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -33,8 +32,6 @@ import (
 
 	"github.com/caddyserver/caddy/v2"
 )
-
-var noopLogger = zap.NewNop()
 
 func init() {
 	caddy.RegisterModule(Transport{})
@@ -72,11 +69,6 @@ type Transport struct {
 	// The duration used to set a deadline when sending to the SCGI server.
 	WriteTimeout caddy.Duration `json:"write_timeout,omitempty"`
 
-	// Capture and log any messages sent by the upstream on stderr. Logs at WARN
-	// level by default. If the response has a 4xx or 5xx status ERROR level will
-	// be used instead.
-	CaptureStderr bool `json:"capture_stderr,omitempty"`
-
 	serverSoftware string
 	logger         *zap.Logger
 }
@@ -91,16 +83,14 @@ func (Transport) CaddyModule() caddy.ModuleInfo {
 
 // Provision sets up t.
 func (t *Transport) Provision(ctx caddy.Context) error {
-	t.logger = ctx.Logger(t)
+	t.logger = ctx.Logger()
 
 	if t.Root == "" {
 		t.Root = "{http.vars.root}"
 	}
 
-	t.serverSoftware = "Caddy"
-	if mod := caddy.GoModule(); mod.Version != "" {
-		t.serverSoftware += "/" + mod.Version
-	}
+	version, _ := caddy.Version()
+	t.serverSoftware = "Caddy/" + version
 
 	// Set a relatively short default dial timeout.
 	// This is helpful to make load-balancer retries more speedy.
@@ -120,13 +110,7 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("building environment: %v", err)
 	}
 
-	// TODO: doesn't dialer have a Timeout field?
 	ctx := r.Context()
-	if t.DialTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(t.DialTimeout))
-		defer cancel()
-	}
 
 	// extract dial information from request (should have been embedded by the reverse proxy)
 	network, address := "tcp", r.URL.Host
@@ -141,32 +125,39 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		ShouldLogCredentials: logCreds,
 	}
 	loggableEnv := loggableEnv{vars: env, logCredentials: logCreds}
-	t.logger.Debug("roundtrip",
+
+	logger := t.logger.With(
 		zap.Object("request", loggableReq),
-		zap.String("dial", address),
 		zap.Object("env", loggableEnv),
 	)
+	logger.Debug("roundtrip",
+		zap.String("dial", address),
+		zap.Object("env", loggableEnv),
+		zap.Object("request", loggableReq))
 
-	scgiBackend, err := DialContext(ctx, network, address)
+	// connect to the backend
+	dialer := net.Dialer{Timeout: time.Duration(t.DialTimeout)}
+	conn, err := dialer.DialContext(ctx, network, address)
 	if err != nil {
-		// TODO: wrap in a special error type if the dial failed, so retries can happen if enabled
 		return nil, fmt.Errorf("dialing backend: %v", err)
 	}
-	if t.CaptureStderr {
-		scgiBackend.logger = t.logger.With(
-			zap.Object("request", loggableReq),
-			zap.Object("env", loggableEnv),
-		)
-	} else {
-		scgiBackend.logger = noopLogger
+	defer func() {
+		// conn will be closed with the response body unless there's an error
+		if err != nil {
+			conn.Close()
+		}
+	}()
+
+	// create the client that will facilitate the protocol
+	client := client{
+		rwc:    conn,
 	}
-	// scgiBackend gets closed when response body is closed (see clientCloser)
 
 	// read/write timeouts
-	if err := scgiBackend.SetReadTimeout(time.Duration(t.ReadTimeout)); err != nil {
+	if err := client.SetReadTimeout(time.Duration(t.ReadTimeout)); err != nil {
 		return nil, fmt.Errorf("setting read timeout: %v", err)
 	}
-	if err := scgiBackend.SetWriteTimeout(time.Duration(t.WriteTimeout)); err != nil {
+	if err := client.SetWriteTimeout(time.Duration(t.WriteTimeout)); err != nil {
 		return nil, fmt.Errorf("setting write timeout: %v", err)
 	}
 
@@ -178,16 +169,19 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	switch r.Method {
 	case http.MethodHead:
-		resp, err = scgiBackend.Head(env)
+		resp, err = client.Head(env)
 	case http.MethodGet:
-		resp, err = scgiBackend.Get(env, r.Body, contentLength)
+		resp, err = client.Get(env, r.Body, contentLength)
 	case http.MethodOptions:
-		resp, err = scgiBackend.Options(env)
+		resp, err = client.Options(env)
 	default:
-		resp, err = scgiBackend.Post(env, r.Method, r.Header.Get("Content-Type"), r.Body, contentLength)
+		resp, err = client.Post(env, r.Method, r.Header.Get("Content-Type"), r.Body, contentLength)
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	return resp, err
+	return resp, nil
 }
 
 // buildEnv returns a set of CGI environment variables for the request.
