@@ -18,6 +18,6 @@ type streamReader struct {
 	c      *client
 }
 
-func (r *streamReader) Read(p []byte) (n int, err error) {
+func (r *streamReader) Read(p []byte) (int, error) {
 	return r.c.rwc.Read(p)
 }
