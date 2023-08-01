@@ -44,3 +44,11 @@ route {
   }
 } 
 ```
+
+Docker
+-----------------------------------------------
+You may download a pre-compiled version through Github using the below:
+
+```
+docker pull ghcr.io/elegant996/scgi-transport:1.0.2-caddy-2.6.4
+```
