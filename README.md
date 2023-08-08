@@ -47,8 +47,10 @@ route {
 
 Docker
 -----------------------------------------------
-You may download a pre-compiled version through Github using the below:
+You may download a pre-compiled version of `caddy` embedded with this module through the GitHub Container Registry using any of the below:
 
 ```
-docker pull ghcr.io/elegant996/scgi-transport:1.0.2-caddy-2.6.4
+docker pull ghcr.io/elegant996/scgi-transport:1.0.2-caddy-2.7.3
+docker pull ghcr.io/elegant996/scgi-transport:1.0.2
+docker pull ghcr.io/elegant996/scgi-transport:latest
 ```

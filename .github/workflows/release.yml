@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  CADDY_VERSION: 2.6.4
+  CADDY_VERSION: 2.7.3
 
 jobs:
   docker:
@@ -50,3 +50,5 @@ jobs:
         push: true
         tags: |
           ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_tag.outputs.TAG }}-caddy-${{ env.CADDY_VERSION }}
+          ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_tag.outputs.TAG }}
+          ghcr.io/${{ steps.image_id.outputs.ID }}:latest
