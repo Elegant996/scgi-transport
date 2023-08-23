@@ -39,7 +39,6 @@ func init() {
 //	    dial_timeout <duration>
 //	    read_timeout <duration>
 //	    write_timeout <duration>
-//	    capture_stderr
 //	}
 //
 func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
