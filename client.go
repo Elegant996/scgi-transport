@@ -158,7 +158,6 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 
 // Get issues a GET request to the scgi responder.
 func (c *client) Get(p map[string]string, body io.Reader, l int64) (resp *http.Response, err error) {
-
 	p["REQUEST_METHOD"] = "GET"
 	p["CONTENT_LENGTH"] = strconv.FormatInt(l, 10)
 
@@ -167,7 +166,6 @@ func (c *client) Get(p map[string]string, body io.Reader, l int64) (resp *http.R
 
 // Head issues a HEAD request to the scgi responder.
 func (c *client) Head(p map[string]string) (resp *http.Response, err error) {
-
 	p["REQUEST_METHOD"] = "HEAD"
 	p["CONTENT_LENGTH"] = "0"
 
@@ -176,7 +174,6 @@ func (c *client) Head(p map[string]string) (resp *http.Response, err error) {
 
 // Options issues an OPTIONS request to the scgi responder.
 func (c *client) Options(p map[string]string) (resp *http.Response, err error) {
-
 	p["REQUEST_METHOD"] = "OPTIONS"
 	p["CONTENT_LENGTH"] = "0"
 
