@@ -41,7 +41,7 @@ jobs:
       run: echo "{ID}=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
 
     - name: Publish to GitHub Container Registry
-      uses: docker/build-push-action@v4
+      uses: docker/build-push-action@v5
       with:
         build-args: |
           CADDY_VERSION=${{ env.CADDY_VERSION }}
