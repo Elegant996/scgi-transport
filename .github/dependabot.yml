@@ -4,8 +4,7 @@ updates:
   - directory: /
     package-ecosystem: github-actions
     schedule:
-      interval: monthly
-      day: saturday
+      interval: weekly
     commit-message:
       prefix: ci
     labels:
@@ -14,19 +13,29 @@ updates:
   - directory: /
     package-ecosystem: gomod
     schedule:
-      interval: monthly
-      day: saturday
+      interval: weekly
     commit-message:
       prefix: build(go)
     labels:
       - dependencies
+    groups:
+      caddy:
+        patterns:
+          - "*caddy*"
+        update-types:
+          - "minor"
   # Update Docker base images
   - directory: /
     package-ecosystem: docker
     schedule:
-      interval: monthly
-      day: saturday
+      interval: weekly
     commit-message:
       prefix: build(docker)
     labels:
       - dependencies
+    groups:
+      caddy:
+        patterns:
+          - "caddy*"
+        update-types:
+          - "minor"

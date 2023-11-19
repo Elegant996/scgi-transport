@@ -43,16 +43,13 @@ jobs:
       with:
         images: ghcr.io/${{ github.repository }}
         tags: |
-          ${{ steps.get_tag.outputs.TAG }}-caddy-${{ env.CADDY_VERSION }},
+          ${{ steps.get_tag.outputs.TAG }}-caddy-${{ env.CADDY_VERSION }}
           ${{ steps.get_tag.outputs.TAG }}
           latest
 
     - name: Build and push
       uses: docker/build-push-action@v5
       with:
-        build-args: |
-          CADDY_VERSION=${{ env.CADDY_VERSION }}
-          TAG=${{ steps.get_tag.outputs.TAG }}
         context: .
         push: true
         tags: ${{ steps.meta.outputs.tags }}
