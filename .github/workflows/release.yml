@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  CADDY_VERSION: 2.7.4
+  CADDY_VERSION: 2.7.5
 
 jobs:
   docker:
@@ -17,38 +17,42 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Get the tag
       id: get_tag
-      run: echo "{TAG}=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_OUTPUT
+      run: |
+        echo "TAG=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_OUTPUT
 
     # - name: Set up QEMU
     #   run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     - name: Login to GitHub Container Registry
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Set image identity
-      id: image_id
-      run: echo "{ID}=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          ${{ steps.get_tag.outputs.TAG }}-caddy-${{ env.CADDY_VERSION }},
+          ${{ steps.get_tag.outputs.TAG }}
+          latest
 
-    - name: Publish to GitHub Container Registry
-      uses: docker/build-push-action@v4
+    - name: Build and push
+      uses: docker/build-push-action@v5
       with:
         build-args: |
           CADDY_VERSION=${{ env.CADDY_VERSION }}
           TAG=${{ steps.get_tag.outputs.TAG }}
         context: .
         push: true
-        tags: |
-          ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_tag.outputs.TAG }}-caddy-${{ env.CADDY_VERSION }}
-          ghcr.io/${{ steps.image_id.outputs.ID }}:${{ steps.get_tag.outputs.TAG }}
-          ghcr.io/${{ steps.image_id.outputs.ID }}:latest
+        tags: ${{ steps.meta.outputs.tags }}
