@@ -1,0 +1,238 @@
+name: Dependabot auto-approve
+on: pull_request
+
+permissions:
+  pull-requests: write
+
+jobs:
+  dependabot:
+    name: 'Dependabot updates'
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+
+    outputs:
+      previousVersion: '${{ steps.dependabot.outputs.previous-version }}'
+      newVersion: '${{ steps.dependabot.outputs.new-version }}'
+      dockerUpdate: ${{ steps.dependabot.outputs.package-ecosystem == 'docker' }}
+
+    steps:
+    - name: Dependabot metadata
+      id: metadata
+      uses: dependabot/fetch-metadata@v2
+      with:
+        github-token: "${{ github.token }}"
+
+    - name: Approve a PR
+      run: gh pr review --approve "$PR_URL"
+      env:
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Auto-merge docker PRs
+      if: ${{ steps.dependabot.outputs.package-ecosystem == 'docker' &&
+        steps.dependabot-metadata.outputs.update-type != 'version-update:semver-major'}}
+      run: |
+        gh pr merge --auto --squash "$PR_URL"
+      env:
+        PR_URL: ${{ github.event.pull_request.html_url }}
+        GITHUB_TOKEN: ${{ github.token }}
+
+  prepare-build:
+    name: 'Updates files for build'
+    runs-on: ubuntu-latest
+    needs: dependabot
+    if: ${{ needs.dependabot.outputs.dockerUpdate }} == 'true'
+
+    permissions:
+      contents: write
+
+    outputs:
+      previousVersion: '${{ steps.latest.outputs.version }}'
+      newVersion: '${{ steps.semvers.outputs.patch }}'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get latest tag
+      id: latest
+      run: |
+        TAG=$(curl -sL --request GET \
+          --url "${{ github.api_url }}/repos/${{ github.repository }}/releases" \
+          --header "Accept: application/vnd.github+json" \
+          --header "Authorization: token ${{ github.token }}" \
+          | jq -r 'first(.[]) | .tag_name')
+
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        echo "version=${TAG//v}" >> $GITHUB_OUTPUT
+    
+    - name: Generate next semantic version
+      id: semvers
+      uses: "WyriHaximus/github-action-next-semvers@v1"
+      with:
+        version: ${{ steps.latest.outputs.tag }}
+
+    - name: Setup go
+      uses: actions/setup-go@v5
+      with:
+        go-version: 'stable'
+
+    - name: Update go module
+      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      with:
+        files: go.mod
+        prefix: 'caddy/v2 v'
+        version: '${{ needs.dependabot.outputs.newVersion }}'
+        old-version: '${{ needs.dependabot.outputs.previousVersion }}'
+        with-checkout: false
+
+    - name: Tidy go module
+      uses: evantorrie/mott-the-tidier@v1-beta
+
+    - name: Commit go module changes
+      uses: EndBug/add-and-commit@v9
+      with:
+        committer_name: GitHub Actions
+        committer_email: actions@github.com
+        message: 'build(go): bump github.com/caddyserver/caddy/v2 from ${{ needs.dependabot.outputs.previousVersion }} to ${{ needs.dependabot.outputs.newVersion }}'
+        push: false
+
+    - name: Update Dockerfile
+      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      with:
+        files: Dockerfile
+        prefix: 'scgi-transport@'
+        version: '${{ steps.semvers.outputs.v_patch }}'
+        old-version: '${{ steps.latest.outputs.tag }}'
+        with-checkout: false
+
+    - name: Commit Dockerfile changes
+      uses: EndBug/add-and-commit@v9
+      with:
+        committer_name: GitHub Actions
+        committer_email: actions@github.com
+        message: 'build(docker): bump scgi-transport from ${{ steps.latest.outputs.tag }} to ${{ steps.semvers.outputs.v_patch }}'
+        push: false
+
+    - name: Update Readme scgi-transport
+      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      with:
+        files: README.md
+        prefix: 'scgi-transport:'
+        version: '${{ steps.semvers.outputs.patch }}'
+        old-version: '${{ steps.latest.outputs.version }}'
+        with-checkout: false
+
+    - name: Update Readme caddy
+      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      with:
+        files: README.md
+        prefix: 'caddy-'
+        version: '${{ needs.dependabot.outputs.newVersion }}'
+        old-version: '${{ needs.dependabot.outputs.previousVersion }}'
+        with-checkout: false
+
+    - name: Commit Readme changes; push and tag
+      uses: EndBug/add-and-commit@v9
+      with:
+        committer_name: GitHub Actions
+        committer_email: actions@github.com
+        message: 'docs: update ghcr.io image tags to ${{ steps.semvers.outputs.v_patch }}'
+        tag: '${{ steps.semvers.outputs.v_patch }}'
+
+  build-image:
+    name: 'Build docker image'
+    runs-on: ubuntu-latest
+    needs: [ dependabot, prepare-build ]
+
+    permissions:
+      contents: write
+      packages: write
+
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: ["amd64"]
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+
+    env:
+      caddyVersion: '${{ needs.dependabot.outputs.newVersion }}'
+      previousVersion: '${{ needs.prepare-build.outputs.previousVersion }}'
+      newVersion: '${{ needs.prepare-build.outputs.newVersion }}'
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: 'v${{ env.newVersion }}'
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Sanitize repo slug
+      uses: actions/github-script@v7
+      id: repo_slug
+      with:
+        result-encoding: string
+        script: return '${{ github.repository }}'.toLowerCase()
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push
+      uses: docker/build-push-action@v6
+      continue-on-error: true
+      id: buildx1
+      with:
+        build-args: |
+          VERSION=${{ env.newVersion }}
+        context: .
+        platforms: linux/${{ matrix.arch }}
+        push: true
+        tags: |
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:${{ env.newVersion }}-caddy-${{ env.caddyVersion }}
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:${{ env.newVersion }}
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:latest
+
+    # Temp workaround for failed builds
+    - name: Wait to retry
+      if: steps.buildx1.outcome != 'success'
+      run: |
+        sleep 60
+
+    # Temp workaround for failed builds
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v6
+      if: steps.buildx1.outcome != 'success'
+      with:
+        build-args: |
+          VERSION=${{ env.newVersion }}
+        context: .
+        platforms: linux/${{ matrix.arch }}
+        push: true
+        tags: |
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:${{ env.newVersion }}-caddy-${{ env.caddyVersion }}
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:${{ env.newVersion }}
+          ghcr.io/${{ steps.repo_slug.outputs.result }}:latest
+
+    - name: Generate changelog
+      id: changelog
+      uses: metcalfc/changelog-generator@v4.3.1
+      with:
+        mytoken: ${{ github.token }}
+        head-ref: 'v${{ env.newVersion }}'
+        base-ref: 'v${{ env.previousVersion }}'
+
+    - name: Publish release
+      uses: ncipollo/release-action@v1.14.0
+      with:
+        tag: 'v${{ env.newVersion }}'
+        body: |
+          Changes in this Release: 
+          ${{ steps.changelog.outputs.changelog }}

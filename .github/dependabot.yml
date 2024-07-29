@@ -18,12 +18,8 @@ updates:
       prefix: build(go)
     labels:
       - dependencies
-    groups:
-      caddy:
-        patterns:
-          - "*caddy*"
-        update-types:
-          - "minor"
+    ignore:
+    - dependency-name: 'github.com/caddyserver/caddy/v2'
   # Update Docker base images
   - directory: /
     package-ecosystem: docker
@@ -33,9 +29,3 @@ updates:
       prefix: build(docker)
     labels:
       - dependencies
-    groups:
-      caddy:
-        patterns:
-          - "caddy*"
-        update-types:
-          - "minor"
