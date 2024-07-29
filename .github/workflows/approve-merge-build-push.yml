@@ -212,7 +212,7 @@ jobs:
       if: steps.buildx1.outcome != 'success'
       with:
         build-args: |
-          VERSION=${{ env.newVersion }}
+          VERSION=${{ env.newVersion }}-caddy-${{ env.caddyVersion }}
         context: .
         platforms: linux/${{ matrix.arch }}
         push: true
