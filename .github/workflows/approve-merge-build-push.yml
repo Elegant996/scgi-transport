@@ -29,8 +29,8 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }}
 
     - name: Auto-merge docker PRs
-      if: ${{ steps.dependabot.outputs.package-ecosystem == 'docker' &&
-        steps.dependabot-metadata.outputs.update-type != 'version-update:semver-major'}}
+      if: ${{ steps.metadata.outputs.package-ecosystem == 'docker' &&
+        steps.metadata.outputs.update-type != 'version-update:semver-major'}}
       run: |
         gh pr merge --auto --squash "$PR_URL"
       env:
