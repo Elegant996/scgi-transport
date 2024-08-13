@@ -53,8 +53,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
 
     - name: Get latest tag
       id: latest
