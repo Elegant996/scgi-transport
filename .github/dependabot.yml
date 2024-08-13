@@ -25,6 +25,11 @@ updates:
     package-ecosystem: docker
     schedule:
       interval: weekly
+    groups:
+      caddy:
+        applies-to: version-updates
+        patterns:
+        - "caddy"
     commit-message:
       prefix: build(docker)
     labels:
