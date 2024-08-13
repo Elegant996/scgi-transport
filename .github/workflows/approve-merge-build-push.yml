@@ -72,7 +72,7 @@ jobs:
       id: semvers
       uses: "WyriHaximus/github-action-next-semvers@v1"
       with:
-        version: ${{ steps.latest.outputs.tag }}
+        version: '${{ steps.latest.outputs.tag }}'
 
     - name: Setup go
       uses: actions/setup-go@v5
@@ -80,13 +80,12 @@ jobs:
         go-version: 'stable'
 
     - name: Update go module
-      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      uses: jacobtomlinson/gha-find-replace@v3
       with:
-        files: go.mod
-        prefix: 'caddy/v2 v'
-        version: '${{ needs.dependabot.outputs.newVersion }}'
-        old-version: '${{ needs.dependabot.outputs.previousVersion }}'
-        with-checkout: false
+        find: 'caddy/v2 v${{ needs.dependabot.outputs.previousVersion }}'
+        replace: 'caddy/v2 v${{ needs.dependabot.outputs.newVersion }}'
+        include: 'go.mod'
+        regex: false
 
     - name: Tidy go module
       uses: evantorrie/mott-the-tidier@v1-beta
@@ -100,13 +99,12 @@ jobs:
         push: false
 
     - name: Update Dockerfile
-      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      uses: jacobtomlinson/gha-find-replace@v3
       with:
-        files: Dockerfile
-        prefix: 'scgi-transport@'
-        version: '${{ steps.semvers.outputs.v_patch }}'
-        old-version: '${{ steps.latest.outputs.tag }}'
-        with-checkout: false
+        find: 'scgi-transport@${{ steps.latest.outputs.tag }}'
+        replace: 'scgi-transport@${{ steps.semvers.outputs.v_patch }}'
+        include: 'Dockerfile'
+        regex: false
 
     - name: Commit Dockerfile changes
       uses: EndBug/add-and-commit@v9
@@ -117,22 +115,20 @@ jobs:
         push: false
 
     - name: Update Readme scgi-transport
-      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      uses: jacobtomlinson/gha-find-replace@v3
       with:
-        files: README.md
-        prefix: 'scgi-transport:'
-        version: '${{ steps.semvers.outputs.patch }}'
-        old-version: '${{ steps.latest.outputs.version }}'
-        with-checkout: false
+        find: 'scgi-transport:${{ steps.latest.outputs.version }}'
+        replace: 'scgi-transport:${{ steps.semvers.outputs.patch }}'
+        include: 'README.md'
+        regex: false
 
     - name: Update Readme caddy
-      uses: MathieuSoysal/file-updater-for-release@v1.0.3
+      uses: jacobtomlinson/gha-find-replace@v3
       with:
-        files: README.md
-        prefix: 'caddy-'
-        version: '${{ needs.dependabot.outputs.newVersion }}'
-        old-version: '${{ needs.dependabot.outputs.previousVersion }}'
-        with-checkout: false
+        find: 'caddy-${{ needs.dependabot.outputs.previousVersion }}'
+        replace: 'caddy-${{ needs.dependabot.outputs.newVersion }}'
+        include: 'README.md'
+        regex: false
 
     - name: Commit Readme changes; push and tag
       uses: EndBug/add-and-commit@v9
