@@ -12,7 +12,7 @@ jobs:
     if: ${{ github.actor == 'dependabot[bot]' }}
 
     outputs:
-      previousVersion: '${{ steps.versions.output.previous }}'
+      previousVersion: '${{ steps.versions.outputs.previous }}'
       newVersion: '${{ steps.versions.outputs.new }}'
       dockerUpdate: ${{ steps.dependabot.outputs.package-ecosystem == 'docker' }}
 
