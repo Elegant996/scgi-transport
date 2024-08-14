@@ -3,7 +3,7 @@ FROM caddy:2.8.4-builder-alpine AS builder
 ARG VERSION
 
 RUN xcaddy build \
-    --with github.com/Elegant996/scgi-transport@v1.0.3
+    --with github.com/Elegant996/scgi-transport@v1.0.4
 
 FROM caddy:2.8.4-alpine
 
