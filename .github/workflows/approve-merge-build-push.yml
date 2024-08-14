@@ -91,7 +91,7 @@ jobs:
     - name: Update go module
       uses: jacobtomlinson/gha-find-replace@v3
       with:
-        find: "caddy\/v2 v${{ needs.dependabot.outputs.previousVersion }}"
+        find: "caddy\\/v2 v${{ needs.dependabot.outputs.previousVersion }}"
         replace: "caddy/v2 v${{ needs.dependabot.outputs.newVersion }}"
         include: 'go.mod'
 
