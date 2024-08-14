@@ -26,8 +26,8 @@ jobs:
     - name: Capture versions
       id: versions
       run: |
-        PREVIOUS_VERSION=${{ steps.dependabot.outputs.previous-version }}
-        NEW_VERSION=${{ steps.dependabot.outputs.new-version }}
+        PREVIOUS_VERSION=${{ steps.metadata.outputs.previous-version }}
+        NEW_VERSION=${{ steps.metadata.outputs.new-version }}
 
         echo "previous=${PREVIOUS_VERSION//-alpine}" >> $GITHUB_OUTPUT
         echo "new=${NEW_VERSION//-alpine}" >> $GITHUB_OUTPUT
