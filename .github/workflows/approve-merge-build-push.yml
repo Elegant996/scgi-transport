@@ -12,8 +12,8 @@ jobs:
     if: ${{ github.actor == 'dependabot[bot]' }}
 
     outputs:
-      previousVersion: '${{ steps.dependabot.outputs.previous-version }}'
-      newVersion: '${{ steps.dependabot.outputs.new-version }}'
+      previousVersion: '${{ steps.versions.output.previous }}'
+      newVersion: '${{ steps.versions.outputs.new }}'
       dockerUpdate: ${{ steps.dependabot.outputs.package-ecosystem == 'docker' }}
 
     steps:
@@ -22,6 +22,15 @@ jobs:
       uses: dependabot/fetch-metadata@v2
       with:
         github-token: "${{ github.token }}"
+
+    - name: Capture versions
+      id: versions
+      run: |
+        PREVIOUS_VERSION=${{ steps.dependabot.outputs.previous-version }}
+        NEW_VERSION=${{ steps.dependabot.outputs.new-version }}
+
+        echo "previous=${PREVIOUS_VERSION//-alpine}" >> $GITHUB_OUTPUT
+        echo "new=${NEW_VERSION//-alpine}" >> $GITHUB_OUTPUT
 
     - name: Approve a PR
       run: gh pr review --approve "$PR_URL"
