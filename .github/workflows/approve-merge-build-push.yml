@@ -91,8 +91,8 @@ jobs:
     - name: Update go module
       uses: jacobtomlinson/gha-find-replace@v3
       with:
-        find: "caddy/v2 v${{ needs.dependabot.outputs.previousVersion }}"
-        replace: "caddy/v2 v${{ needs.dependabot.outputs.newVersion }}"
+        find: 'caddy/v2 v${{ needs.dependabot.outputs.previousVersion }}'
+        replace: 'caddy/v2 v${{ needs.dependabot.outputs.newVersion }}'
         include: 'go.mod'
         regex: false
 
@@ -111,8 +111,8 @@ jobs:
     - name: Update Dockerfile
       uses: jacobtomlinson/gha-find-replace@v3
       with:
-        find: "scgi-transport@${{ steps.latest.outputs.tag }}"
-        replace: "scgi-transport@${{ steps.semvers.outputs.v_patch }}"
+        find: 'scgi-transport@${{ steps.latest.outputs.tag }}'
+        replace: 'scgi-transport@${{ steps.semvers.outputs.v_patch }}'
         include: 'Dockerfile'
         regex: false
 
@@ -127,16 +127,16 @@ jobs:
     - name: Update Readme scgi-transport
       uses: jacobtomlinson/gha-find-replace@v3
       with:
-        find: "scgi-transport:${{ steps.latest.outputs.version }}"
-        replace: "scgi-transport:${{ steps.semvers.outputs.patch }}"
+        find: 'scgi-transport:${{ steps.latest.outputs.version }}'
+        replace: 'scgi-transport:${{ steps.semvers.outputs.patch }}'
         include: 'README.md'
         regex: false
 
     - name: Update Readme caddy
       uses: jacobtomlinson/gha-find-replace@v3
       with:
-        find: "caddy-${{ needs.dependabot.outputs.previousVersion }}"
-        replace: "caddy-${{ needs.dependabot.outputs.newVersion }}"
+        find: 'caddy-${{ needs.dependabot.outputs.previousVersion }}'
+        replace: 'caddy-${{ needs.dependabot.outputs.newVersion }}'
         include: 'README.md'
         regex: false
 
