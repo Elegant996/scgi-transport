@@ -24,11 +24,12 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./dev.Dockerfile
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: stable-test
 
       - name: Test
         run: |
-          docker run --rm caddy stop
+          docker run --rm --entrypoint /usr/bin/caddy stop
   
