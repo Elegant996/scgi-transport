@@ -216,7 +216,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "]", "", 1)
 
 	// make sure file root is absolute
-	root, err := caddy.FastAbs(repl.ReplaceAll(t.Root, "."))
+	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
 	if err != nil {
 		return nil, err
 	}
