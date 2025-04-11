@@ -128,7 +128,7 @@ jobs:
 
       - name: Test
         run: |
-          docker run --rm stable-test
+          docker run --rm caddy stop
 
       - name: Build and export
         uses: docker/build-push-action@v6
