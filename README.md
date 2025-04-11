@@ -25,6 +25,7 @@ scgi [<matcher>] <gateways...> {
   dial_timeout  <duration>
   read_timeout  <duration>
   write_timeout <duration>
+  capture_stderr
 
   <any other reverse_proxy subdirectives...>
 }

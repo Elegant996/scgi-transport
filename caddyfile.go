@@ -103,6 +103,12 @@ func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				}
 				t.WriteTimeout = caddy.Duration(dur)
 
+			case "capture_stderr":
+				if d.NextArg() {
+					return d.ArgErr()
+				}
+				t.CaptureStderr = true
+
 			default:
 				return d.Errf("unrecognized subdirective %s", d.Val())
 			}
@@ -235,6 +241,12 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				}
 				scgiTransport.WriteTimeout = caddy.Duration(dur)
 				dispenser.DeleteN(2)
+			}
+
+			case "capture_stderr":
+				args := dispenser.RemainingArgs()
+				dispenser.DeleteN(len(args) + 1)
+				scgiTransport.CaptureStderr = true
 			}
 		}
 	}

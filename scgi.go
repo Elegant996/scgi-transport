@@ -71,6 +71,11 @@ type Transport struct {
 	// The duration used to set a deadline when sending to the SCGI server.
 	WriteTimeout caddy.Duration `json:"write_timeout,omitempty"`
 
+	// Capture and log any messages sent by the upstream on stderr. Logs at WARN
+	// level by default. If the response has a 4xx or 5xx status ERROR level will
+	// be used instead.
+	CaptureStderr bool `json:"capture_stderr,omitempty"`
+
 	serverSoftware string
 	logger         *zap.Logger
 }
@@ -157,6 +162,7 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	client := client{
 		rwc:    conn,
 		logger: logger,
+		stderr: t.CaptureStderr,
 	}
 
 	// read/write timeouts
