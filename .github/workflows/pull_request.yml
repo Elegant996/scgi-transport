@@ -2,12 +2,21 @@ name: Dependabot auto-approve
 on: pull_request
 
 permissions:
+  contents: write
   pull-requests: write
 
 jobs:
-  dependabot:
+  metadata:
+    name: 'Retrieve metadata'
     runs-on: ubuntu-latest
     if: ${{ github.actor == 'dependabot[bot]' }}
+
+    outputs:
+      package-ecosystem: ${{ steps.metadata.outputs.package-ecosystem }}
+      previous-version: ${{ steps.metadata.outputs.package-ecosystem == 'docker' && steps.trim.outputs.previous-version || steps.metadata.outputs.previous-version }}
+      new-version: ${{ steps.metadata.outputs.package-ecosystem == 'docker' && steps.trim.outputs.new-version || steps.metadata.outputs.new-version }}
+      update-type: ${{ steps.metadata.outputs.update-type }}
+
     steps:
       - name: Dependabot metadata
         id: metadata
@@ -15,9 +24,260 @@ jobs:
         with:
           github-token: "${{ github.token }}"
 
+      - name: Trim suffix from versions
+        id: trim
+        if: ${{ steps.metadata.outputs.package-ecosystem == 'docker' }}
+        run: |
+          previous-version=${{ steps.metadata.outputs.previous-version }}
+          new-version=${{ steps.metadata.outputs.new-version }}
+
+          echo "previous-version=${previous-version//-alpine}" >> $GITHUB_OUTPUT
+          echo "new-version=${new-version//-alpine}" >> $GITHUB_OUTPUT
+
+  go-mod:
+    needs: [metadata]
+    name: 'Update go module'
+    runs-on: ubuntu-latest
+    if: ${{ needs.metadata.outputs.package-ecosystem == 'docker' }}
+
+    outputs:
+      commit-sha: ${{ steps.commit.outputs.commit_long_sha }}
+
+    env:
+      previous-version: ${{ needs.metadata.outputs.previous-version }}
+      new-version: ${{ needs.metadata.outputs.new-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Update go module
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: 'caddy/v2 v${previous_version}'
+          replace: 'caddy/v2 v${new_version}'
+          include: 'go.mod'
+          regex: false
+
+      - name: Tidy go module
+        run: |
+          go mod tidy
+
+      - name: Commit go module changes
+        id: commit
+        uses: EndBug/add-and-commit@v9
+        with:
+          message: 'build(go): bump github.com/caddyserver/caddy/v2 from v${previous-version} to v${new_version}'
+
+  build:
+    needs: [metadata,go-mod]
+    name: Build and test image
+    runs-on: ubuntu-latest
+    if: always()
+
+    strategy:
+      fail-fast: true
+      matrix:
+        arch: ["amd64"]
+        include:
+          - arch: amd64
+            os: ubuntu-latest
+
+    env:
+      sha-ref: ${{ needs.metadata.outputs.package-ecosystem == 'docker' && needs.go-mod.outputs.commit-sha || github.event.pull_request.head.ref }}
+
+    steps:      
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.sha-ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and export to Docker
+        uses: docker/build-push-action@v6
+        continue-on-error: true
+        id: buildx1
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: stable-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Temp workaround for failed builds
+      - name: Wait to retry
+        if: steps.buildx1.outcome != 'success'
+        run: |
+          sleep 60
+
+      # Temp workaround for failed builds
+      - name: Build and export to Docker
+        uses: docker/build-push-action@v6
+        if: steps.buildx1.outcome != 'success'
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: stable-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test
+        run: |
+          docker run --rm stable-test
+
+      - name: Build and export
+        uses: docker/build-push-action@v6
+        with:
+          tags: scgi-transport:latest
+          outputs: type=docker,dest=${{ github.event.repository.name }}.tar
+  
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}
+          path: ${{ github.event.repository.name }}.tar
+
+  dependabot:
+    needs: [build]
+    name: 'Dependabot updates'
+    runs-on: ubuntu-latest
+    if: ${{ github.actor == 'dependabot[bot]' }}
+
+    steps:
       - name: Approve a PR
-        if: ${{ steps.metadata.outputs.package-ecosystem != 'docker' }}
         run: gh pr review --approve "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Auto-merge docker PRs
+        run: |
+          gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  update-docs:
+    needs: [metadata,dependabot]
+    name: 'Update the docs and tag the commit'
+    runs-on: ubuntu-latest
+    if: ${{ needs.metadata.outputs.package-ecosystem == 'docker' }}
+
+    outputs:
+      tag: ${{ steps.semvers.outputs.v_patch }}
+      version: ${{ steps.semvers.outputs.patch }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 'main'
+
+      - name: Get latest tag
+        id: latest
+        run: |
+          tag=$(curl -sL --request GET \
+            --url "${{ github.api_url }}/repos/${{ github.repository }}/releases" \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: token ${{ github.token }}" \
+            | jq -r 'first | .tag_name')
+
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+          echo "version=${tag//v}" >> $GITHUB_OUTPUT
+      
+      - name: Generate next semantic version
+        id: semvers
+        uses: "WyriHaximus/github-action-next-semvers@v1"
+        with:
+          version: ${{ steps.latest.outputs.tag }}
+
+      - name: Update Readme (scgi-transport)
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: 'scgi-transport:${{ steps.latest.outputs.version }}'
+          replace: 'scgi-transport:${{ steps.semvers.outputs.patch }}'
+          include: 'README.md'
+          regex: false
+
+      - name: Update Readme (caddy)
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: 'caddy-${{ needs.metadata.outputs.previous-version }}'
+          replace: 'caddy-${{ needs.metadata.outputs.new-version }}'
+          include: 'README.md'
+          regex: false
+
+      - name: Commit, push and tag
+        uses: EndBug/add-and-commit@v9
+        with:
+          committer_name: GitHub Actions
+          committer_email: actions@github.com
+          message: 'Updating package versions'
+          tag: ${{ steps.semvers.outputs.v_patch }}
+
+  publish-release:
+    needs: [build,update-docs]
+    name: 'Publish the release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.3.1
+        with:
+          mytoken: ${{ github.token }}
+          head-ref: ${{ needs.update-docs.outputs.tag }}
+
+      - name: Publish release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          tag: ${{ needs.update-docs.outputs.tag }}
+          body: |
+            Changes in this Release: 
+            ${{ steps.changelog.outputs.changelog }}
+
+  push-image:
+    needs: [metadata,build,update-docs]
+    name: 'Push image to GHCR'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "!*.dockerbuild"
+          name: ${{ github.event.repository.name }}
+          path: ${{ github.event.repository.name }}.tar
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ github.token }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.update-docs.outputs.tag }}
+          flavor: |
+            suffix=-caddy-${{ needs.metadata.outputs.new-version }}
+
+      - name: Push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=${{ github.event.repository.name }}.tar
