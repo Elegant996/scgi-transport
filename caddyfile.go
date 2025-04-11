@@ -150,8 +150,8 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	// set up the transport for SCGI
 	scgiTransport := Transport{}
 
-	// set up the set of split paths
-	splits := []string
+	// set up for split paths
+	var splits []string
 
 	// if the user specified a matcher token, use that
 	// matcher in a route that wraps both of our routes;
