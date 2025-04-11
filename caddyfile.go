@@ -39,6 +39,7 @@ func init() {
 //	    dial_timeout <duration>
 //	    read_timeout <duration>
 //	    write_timeout <duration>
+//	    capture_stderr
 //	}
 //
 func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
@@ -149,6 +150,9 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	// set up the transport for SCGI
 	scgiTransport := Transport{}
 
+	// set up the set of split paths
+	splits := []string
+
 	// if the user specified a matcher token, use that
 	// matcher in a route that wraps both of our routes;
 	// either way, strip the matcher token and pass
@@ -187,9 +191,9 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				dispenser.DeleteN(2)
 
 			case "split":
-				extensions = dispenser.RemainingArgs()
-				dispenser.DeleteN(len(extensions) + 1)
-				if len(extensions) == 0 {
+				splits = dispenser.RemainingArgs()
+				dispenser.DeleteN(len(splits) + 1)
+				if len(splits) == 0 {
 					return nil, dispenser.ArgErr()
 				}
 
@@ -258,7 +262,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 	routes := caddyhttp.RouteList{}
 
 	// set the list of allowed path segments on which to split
-	scgiTransport.SplitPath = extensions
+	scgiTransport.SplitPath = splits
 
 	// create the reverse proxy handler which uses our SCGI transport
 	rpHandler := &reverseproxy.Handler{
