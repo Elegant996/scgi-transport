@@ -14,6 +14,10 @@
 
 package scgi
 
+import (
+	"bytes"
+)
+
 type streamReader struct {
 	c      *client
 	stderr bytes.Buffer
