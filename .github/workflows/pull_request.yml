@@ -90,6 +90,7 @@ jobs:
             os: ubuntu-latest
 
     env:
+      dockerfile: ${{ needs.metadata.outputs.package-ecosystem == 'docker' && 'Dockerfile' || 'dev.Dockerfile' }}
       sha-ref: ${{ needs.metadata.outputs.package-ecosystem == 'docker' && needs.go-mod.outputs.commit-sha || github.event.pull_request.head.ref }}
 
     steps:      
@@ -106,6 +107,7 @@ jobs:
         id: buildx1
         with:
           context: .
+          file: ./${{ env.dockerfile }}
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: stable-test
@@ -122,6 +124,7 @@ jobs:
         if: steps.buildx1.outcome != 'success'
         with:
           context: .
+          file: ./${{ env.dockerfile }}
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: stable-test
