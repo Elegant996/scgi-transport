@@ -241,7 +241,6 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 				}
 				scgiTransport.WriteTimeout = caddy.Duration(dur)
 				dispenser.DeleteN(2)
-			}
 
 			case "capture_stderr":
 				args := dispenser.RemainingArgs()
