@@ -109,8 +109,6 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: stable-test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       # Temp workaround for failed builds
       - name: Wait to retry
@@ -127,8 +125,6 @@ jobs:
           platforms: linux/${{ matrix.arch }}
           load: true
           tags: stable-test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Test
         run: |
