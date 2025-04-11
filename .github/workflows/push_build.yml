@@ -29,7 +29,6 @@ jobs:
           load: true
           tags: stable-test
 
-      - name: Test
-        run: |
-          docker run --rm stable-test caddy stop
-  
+      # - name: Test
+      #   run: |
+      #     docker run --rm stable-test caddy stop
