@@ -47,6 +47,7 @@ var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3
 type client struct {
 	rwc net.Conn
 	// keepAlive bool // TODO: implement
+	stderr bool
 	logger *zap.Logger
 }
 

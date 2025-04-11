@@ -33,6 +33,8 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddytls"
 )
 
+var noopLogger = zap.NewNop()
+
 func init() {
 	caddy.RegisterModule(Transport{})
 }
@@ -154,6 +156,7 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	// create the client that will facilitate the protocol
 	client := client{
 		rwc:    conn,
+		logger: logger,
 	}
 
 	// read/write timeouts
