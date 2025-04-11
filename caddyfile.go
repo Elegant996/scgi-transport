@@ -178,26 +178,18 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					return nil, dispenser.ArgErr()
 				}
 				scgiTransport.Root = dispenser.Val()
-				dispenser.Delete()
-				dispenser.Delete()
+				dispenser.DeleteN(2)
 
 			case "split":
-				args := dispenser.RemainingArgs()
-				dispenser.Delete()
-				for range args {
-					dispenser.Delete()
-				}
-				if len(args) == 0 {
+				extensions = dispenser.RemainingArgs()
+				dispenser.DeleteN(len(extensions) + 1)
+				if len(extensions) == 0 {
 					return nil, dispenser.ArgErr()
 				}
-				scgiTransport.SplitPath = args
 
 			case "env":
 				args := dispenser.RemainingArgs()
-				dispenser.Delete()
-				for range args {
-					dispenser.Delete()
-				}
+				dispenser.DeleteN(len(args) + 1)
 				if len(args) != 2 {
 					return nil, dispenser.ArgErr()
 				}
@@ -208,10 +200,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 			case "resolve_root_symlink":
 				args := dispenser.RemainingArgs()
-				dispenser.Delete()
-				for range args {
-					dispenser.Delete()
-				}
+				dispenser.DeleteN(len(args) + 1)
 				scgiTransport.ResolveRootSymlink = true
 
 			case "dial_timeout":
@@ -223,8 +212,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
 				scgiTransport.DialTimeout = caddy.Duration(dur)
-				dispenser.Delete()
-				dispenser.Delete()
+				dispenser.DeleteN(2)
 
 			case "read_timeout":
 				if !dispenser.NextArg() {
@@ -235,8 +223,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
 				scgiTransport.ReadTimeout = caddy.Duration(dur)
-				dispenser.Delete()
-				dispenser.Delete()
+				dispenser.DeleteN(2)
 
 			case "write_timeout":
 				if !dispenser.NextArg() {
@@ -247,8 +234,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 					return nil, dispenser.Errf("bad timeout value %s: %v", dispenser.Val(), err)
 				}
 				scgiTransport.WriteTimeout = caddy.Duration(dur)
-				dispenser.Delete()
-				dispenser.Delete()
+				dispenser.DeleteN(2)
 			}
 		}
 	}
@@ -259,6 +245,9 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// set up a route list that we'll append to
 	routes := caddyhttp.RouteList{}
+
+	// set the list of allowed path segments on which to split
+	scgiTransport.SplitPath = extensions
 
 	// create the reverse proxy handler which uses our SCGI transport
 	rpHandler := &reverseproxy.Handler{
