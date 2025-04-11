@@ -82,6 +82,7 @@ func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error)
 // that closes the client connection.
 type clientCloser struct {
 	rwc net.Conn
+	r   *streamReader
 	io.Reader
 
 	status int
