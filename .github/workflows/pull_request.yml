@@ -60,8 +60,8 @@ jobs:
       - name: Update go module
         uses: jacobtomlinson/gha-find-replace@v3
         with:
-          find: 'caddy/v2 v${previous_version}'
-          replace: 'caddy/v2 v${new_version}'
+          find: 'caddy/v2 v${{ env.previous-version }}'
+          replace: 'caddy/v2 v${{ env.new-version }}'
           include: 'go.mod'
           regex: false
 
@@ -73,7 +73,7 @@ jobs:
         id: commit
         uses: EndBug/add-and-commit@v9
         with:
-          message: 'build(go): bump github.com/caddyserver/caddy/v2 from v${previous-version} to v${new_version}'
+          message: 'build(go): bump github.com/caddyserver/caddy/v2 from v${{ env.previous-version }} to v${{ env.new-version }}'
 
   build:
     needs: [metadata,go-mod]
