@@ -268,7 +268,7 @@ jobs:
 
       - name: Sanitize repo slug
         uses: actions/github-script@v7
-        id: repo_slug
+        id: repo-slug
         with:
           result-encoding: string
           script: return '${{ github.repository }}'.toLowerCase()
@@ -278,7 +278,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ steps.repo_slug.outputs.result }}
+            ghcr.io/${{ steps.repo-slug.outputs.result }}
           tags: |
             type=semver,pattern={{version}},priority=950,value=${{ needs.update-docs.outputs.tag }}
             type=semver,pattern={{version}},value=${{ needs.update-docs.outputs.tag }},suffix=suffix=-caddy-${{ needs.metadata.outputs.new-version }}
