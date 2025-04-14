@@ -9,7 +9,7 @@ jobs:
   metadata:
     name: 'Retrieve metadata'
     runs-on: ubuntu-latest
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    if: github.actor == 'dependabot[bot]'
 
     outputs:
       package-ecosystem: ${{ steps.metadata.outputs.package-ecosystem }}
@@ -26,7 +26,7 @@ jobs:
 
       - name: Trim suffix from versions
         id: trim
-        if: ${{ steps.metadata.outputs.package-ecosystem == 'docker' }}
+        if: steps.metadata.outputs.package-ecosystem == 'docker'
         run: |
           previous-version=${{ steps.metadata.outputs.previous-version }}
           new-version=${{ steps.metadata.outputs.new-version }}
@@ -38,7 +38,7 @@ jobs:
     needs: [metadata]
     name: 'Update go module'
     runs-on: ubuntu-latest
-    if: ${{ needs.metadata.outputs.package-ecosystem == 'docker' }}
+    if: needs.metadata.outputs.package-ecosystem == 'docker'
 
     outputs:
       commit-sha: ${{ steps.commit.outputs.commit_long_sha }}
@@ -149,7 +149,7 @@ jobs:
     needs: [build]
     name: 'Dependabot updates'
     runs-on: ubuntu-latest
-    if: ${{ github.actor == 'dependabot[bot]' }}
+    if: github.actor == 'dependabot[bot]'
 
     steps:
       - name: Approve a PR
@@ -169,7 +169,7 @@ jobs:
     needs: [metadata,dependabot]
     name: 'Update the docs and tag the commit'
     runs-on: ubuntu-latest
-    if: ${{ needs.metadata.outputs.package-ecosystem == 'docker' }}
+    if: needs.metadata.outputs.package-ecosystem == 'docker'
 
     outputs:
       tag: ${{ steps.semvers.outputs.v_patch }}
