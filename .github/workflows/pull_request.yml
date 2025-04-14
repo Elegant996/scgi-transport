@@ -266,10 +266,19 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ github.token }}
 
+      - name: Sanitize repo slug
+        uses: actions/github-script@v7
+        id: repo_slug
+        with:
+          result-encoding: string
+          script: return '${{ github.repository }}'.toLowerCase()
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
+          images: |
+            ghcr.io/${{ steps.repo_slug.outputs.result }}
           tags: |
             type=semver,pattern={{version}},value=${{ needs.update-docs.outputs.tag }}
           flavor: |
