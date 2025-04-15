@@ -9,6 +9,7 @@ updates:
       prefix: ci
     labels:
       - dependencies
+      
   # Update Go dependencies
   - directory: /
     package-ecosystem: gomod
@@ -20,6 +21,7 @@ updates:
       - dependencies
     ignore:
     - dependency-name: 'github.com/caddyserver/caddy/v2'
+
   # Update Docker base images
   - directory: /
     package-ecosystem: docker
