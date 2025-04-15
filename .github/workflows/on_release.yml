@@ -1,0 +1,30 @@
+name: Add changelog to release
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Get previous release
+        id: previous-release
+        uses: sammcoe/get-previous-release-action@v1
+
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.6.2
+        with:
+          mytoken: ${{ github.token }}
+          base-ref: ${{ steps.previous-release.outputs.release }}
+
+      - name: Update release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          omitNameDuringUpdate: true
+          omitPrereleaseDuringUpdate: true
+          body: |
+              Changes in this Release: 
+              ${{ steps.changelog.outputs.changelog }}

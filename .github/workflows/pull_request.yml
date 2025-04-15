@@ -228,20 +228,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Generate changelog
-        id: changelog
-        uses: metcalfc/changelog-generator@v4.6.2
-        with:
-          mytoken: ${{ github.token }}
-          head-ref: ${{ needs.update-docs.outputs.tag }}
-
       - name: Publish release
         uses: ncipollo/release-action@v1.16.0
         with:
           tag: ${{ needs.update-docs.outputs.tag }}
-          body: |
-            Changes in this Release: 
-            ${{ steps.changelog.outputs.changelog }}
+          token: ${{ secrets.WF_PAT }}
 
   push-image:
     needs: [metadata,build,update-docs]
