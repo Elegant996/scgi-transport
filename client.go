@@ -34,6 +34,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // StatusRegex describes the pattern for a raw HTTP Response code.
@@ -44,6 +47,8 @@ var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3
 type client struct {
 	rwc net.Conn
 	// keepAlive bool // TODO: implement
+	stderr bool
+	logger *zap.Logger
 }
 
 // Do made the request and returns a io.Reader that translates the data read
@@ -78,12 +83,30 @@ func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error)
 // that closes the client connection.
 type clientCloser struct {
 	rwc net.Conn
+	r   *streamReader
 	io.Reader
 
 	status int
+	logger *zap.Logger
 }
 
-func (c clientCloser) Close() error { return c.rwc.Close() }
+func (s clientCloser) Close() error {
+	stderr := s.r.stderr.Bytes()
+	if len(stderr) == 0 {
+		return s.rwc.Close()
+	}
+
+	logLevel := zapcore.WarnLevel
+	if s.status >= 400 {
+		logLevel = zapcore.ErrorLevel
+	}
+
+	if c := s.logger.Check(logLevel, "stderr"); c != nil {
+		c.Write(zap.ByteString("body", stderr))
+	}
+
+	return s.rwc.Close()
+}
 
 // Request returns a HTTP Response with Header and Body
 // from scgi responder
@@ -145,11 +168,16 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 	// wrap the response body in our closer
 	closer := clientCloser{
 		rwc:    c.rwc,
+		r:      r.(*streamReader),
 		Reader: rb,
 		status: resp.StatusCode,
+		logger: noopLogger,
 	}
 	if chunked(resp.TransferEncoding) {
 		closer.Reader = httputil.NewChunkedReader(rb)
+	}
+	if c.stderr {
+		closer.logger = c.logger
 	}
 	resp.Body = closer
 

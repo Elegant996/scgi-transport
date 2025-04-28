@@ -33,6 +33,8 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddytls"
 )
 
+var noopLogger = zap.NewNop()
+
 func init() {
 	caddy.RegisterModule(Transport{})
 }
@@ -68,6 +70,11 @@ type Transport struct {
 
 	// The duration used to set a deadline when sending to the SCGI server.
 	WriteTimeout caddy.Duration `json:"write_timeout,omitempty"`
+
+	// Capture and log any messages sent by the upstream on stderr. Logs at WARN
+	// level by default. If the response has a 4xx or 5xx status ERROR level will
+	// be used instead.
+	CaptureStderr bool `json:"capture_stderr,omitempty"`
 
 	serverSoftware string
 	logger         *zap.Logger
@@ -130,10 +137,13 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		zap.Object("request", loggableReq),
 		zap.Object("env", loggableEnv),
 	)
-	logger.Debug("roundtrip",
-		zap.String("dial", address),
-		zap.Object("env", loggableEnv),
-		zap.Object("request", loggableReq))
+	if c := t.logger.Check(zapcore.DebugLevel, "roundtrip"); c != nil {
+ 		c.Write(
+ 			zap.String("dial", address),
+ 			zap.Object("env", loggableEnv),
+ 			zap.Object("request", loggableReq),
+ 		)
+ 	}
 
 	// connect to the backend
 	dialer := net.Dialer{Timeout: time.Duration(t.DialTimeout)}
@@ -151,6 +161,8 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	// create the client that will facilitate the protocol
 	client := client{
 		rwc:    conn,
+		logger: logger,
+		stderr: t.CaptureStderr,
 	}
 
 	// read/write timeouts
@@ -204,7 +216,7 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	ip = strings.Replace(ip, "]", "", 1)
 
 	// make sure file root is absolute
-	root, err := filepath.Abs(repl.ReplaceAll(t.Root, "."))
+	root, err := caddy.FastAbs(repl.ReplaceAll(t.Root, "."))
 	if err != nil {
 		return nil, err
 	}
