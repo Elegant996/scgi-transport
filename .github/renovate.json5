@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "groupName": "caddy",
+      "matchDatasources": [
+        "docker",
+        "go"
+      ],
+      "matchPackageNames": [
+        "caddy",
+        "github.com/caddyserver/caddy/v2"
+      ]
+    }
+  ],
+  "postUpdateOptions": [
+    "gomodTidyE": true
+  ],
+  "extends": [
+    "config:recommended"
+  ]
+}
