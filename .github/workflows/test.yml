@@ -2,8 +2,6 @@ name: Tests
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 jobs:
@@ -24,40 +22,20 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and export to Docker
-        uses: docker/build-push-action@v6
-        continue-on-error: true
-        id: buildx1
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          context: .
-          file: ./dev.Dockerfile
-          platforms: linux/${{ matrix.arch }}
-          load: true
-          tags: stable-test
+          go-version-file: './go.mod'
 
-      # Temp workaround for failed builds
-      - name: Wait to retry
-        if: steps.buildx1.outcome != 'success'
+      - name: Install xcaddy
         run: |
-          sleep 60
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+          xcaddy version
 
-      # Temp workaround for failed builds
-      - name: Build and export to Docker
-        uses: docker/build-push-action@v6
-        if: steps.buildx1.outcome != 'success'
-        with:
-          context: .
-          file: ./dev.Dockerfile
-          platforms: linux/${{ matrix.arch }}
-          load: true
-          tags: stable-test
-
-      # - name: Test
-      #   run: |
-      #     docker run --rm stable-test caddy stop
+      - name: Build with xcaddy
+        run: |
+          xcaddy build \
+            --with github.com/Elegant996/scgi-transport=./src
 
   renovate:
     needs: [build]
@@ -78,8 +56,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
   semantic-release:
-    needs: [renovate]
+    needs: [build]
     runs-on: ubuntu-latest
+    if: github.event.pusher.name == 'renovate[bot]'
 
     steps:
       - uses: actions/checkout@v4
@@ -88,7 +67,6 @@ jobs:
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
-        id: semantic
         with:
           branches: |
             [
@@ -109,16 +87,5 @@ jobs:
             @semantic-release/commit-analyzer
             @semantic-release/release-notes-generator
             @semantic-release/git
-          dry_run: true
-          ci: ${{ github.event_name == 'pull_request' && false || '' }}
-          unset_gha_env: ${{ github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Do something when a new release published
-        if: fromJSON(steps.semantic.outputs.new_release_published)
-        run: |
-          echo ${{ steps.semantic.outputs.new_release_version }}
-          echo ${{ steps.semantic.outputs.new_release_major_version }}
-          echo ${{ steps.semantic.outputs.new_release_minor_version }}
-          echo ${{ steps.semantic.outputs.new_release_patch_version }}
