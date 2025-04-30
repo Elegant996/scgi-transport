@@ -2,11 +2,8 @@ name: Tests
 
 on:
   push:
-    branches:
-      - main
   pull_request:
-    branches:
-      - main
+  merge_group:
 
 jobs:
   build:
@@ -59,13 +56,6 @@ jobs:
       # - name: Test
       #   run: |
       #     docker run --rm stable-test caddy stop
-
-      - name: Temporarily merge PR branch
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          git config --global user.name github-actions
-          git config --global user.email github-actions@github.com
-          git merge --no-ff origin/${{ github.event.pull_request.head.ref }} --message "${{ github.event.pull_request.title }}"
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
