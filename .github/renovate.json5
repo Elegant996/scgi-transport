@@ -14,7 +14,7 @@
     }
   ],
   "postUpdateOptions": [
-    "gomodTidyE"
+    "gomodTidy"
   ],
   "extends": [
     "config:recommended"
