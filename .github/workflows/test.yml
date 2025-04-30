@@ -87,7 +87,22 @@ jobs:
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
         id: semantic
-        with:    
+        with:
+          branches: |
+            [
+              '+([0-9])?(.{+([0-9]),x}).x',
+              'main',
+              'next',
+              'next-major',
+              {
+                name: 'beta',
+                prerelease: true
+              },
+              {
+                name: 'alpha',
+                prerelease: true
+              }
+            ]
           extra_plugins: |
             @semantic-release/commit-analyzer
             @semantic-release/release-notes-generator
