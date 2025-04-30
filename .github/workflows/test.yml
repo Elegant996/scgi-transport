@@ -5,21 +5,19 @@ on:
     branches:
       - main
   pull_request:
-  merge_group:
 
 jobs:
   build:
     name: Build using caddy builder
-    runs-on: ubuntu-latest
     environment: production
 
     strategy:
       fail-fast: true
       matrix:
         arch: ["amd64"]
-        include:
-          - arch: amd64
-            os: ubuntu-latest
+        os: 
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +57,33 @@ jobs:
       #   run: |
       #     docker run --rm stable-test caddy stop
 
+  renovate:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'renovate[bot]'
+
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Approve and merge PR
+        run: |
+          gh pr review --approve "$PR_URL"
+          gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  semantic-release:
+    needs: [renovate]
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
         id: semantic
