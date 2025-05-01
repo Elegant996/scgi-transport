@@ -1,19 +1,25 @@
-name: Trigger manual release check
+name: Trigger Release
 
-on: workflow_dispatch
+on:
+  workflow_dispatch
+
+permissions:
+  contents: read
 
 jobs:
   semantic-release:
+    name: Release
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          persist-credentials: false
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v4
@@ -38,4 +44,4 @@ jobs:
             @semantic-release/release-notes-generator
             @semantic-release/git
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
