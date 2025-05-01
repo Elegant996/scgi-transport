@@ -51,11 +51,6 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 
 	w.buf.WriteByte(',')
 
-	return w.FlushStream()
-}
-
-// Flush write buffer data to the underlying connection
-func (w *streamWriter) FlushStream() error {
 	_, err := w.buf.WriteTo(w.c.rwc)
 	return err
 }
