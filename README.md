@@ -48,10 +48,8 @@ route {
 
 Docker
 -----------------------------------------------
-You may download a pre-compiled version of `caddy` embedded with this module through the GitHub Container Registry using any of the below:
+You may pull a pre-compiled container image of `caddy` embedded with this module through any of the [tagged images](https://github.com/Elegant996/scgi-transport/pkgs/container/scgi-transport) on the GitHub Container Registry or using the `latest` tag below:
 
 ```
-docker pull ghcr.io/elegant996/scgi-transport:1.0.4-caddy-2.8.4
-docker pull ghcr.io/elegant996/scgi-transport:1.0.4
 docker pull ghcr.io/elegant996/scgi-transport:latest
 ```

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "description": "Automerge non-major caddy updates",
+      "groupName": "caddy",
+      "matchDatasources": [
+        "docker",
+        "go"
+      ],
+      "matchPackageNames": [
+        "caddy",
+        "github.com/caddyserver/caddy/v2"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Automerge go toolchain updates",
+      "matchDatasources": ["golang-version"],
+      "matchDepNames": ["go"],
+      "matchDepTypes": ["toolchain"],
+      "automerge": true
+    }
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "extends": [
+    "config:recommended"
+  ]
+}
