@@ -20,9 +20,6 @@ import (
 	"strconv"
 )
 
-// SCGI requires content length as the first header
-const FirstHeaderKey string = "CONTENT_LENGTH"
-
 // streamWriter abstracts out the separation of a stream into discrete netstrings.
 type streamWriter struct {
 	c       *client
@@ -35,12 +32,12 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 
 // writeNetstring writes all headers to the buffer
 func (w *streamWriter) writeNetstring(pairs map[string]string) error {
-	if v, ok := pairs[FirstHeaderKey]; ok {
-		w.buf.WriteString(FirstHeaderKey)
+	if v, ok := pairs["CONTENT_LENGTH"]; ok {
+		w.buf.WriteString("CONTENT_LENGTH")
 		w.buf.WriteByte(0x00)
 		w.buf.WriteString(v)
 		w.buf.WriteByte(0x00)
-		delete(pairs, FirstHeaderKey)
+		delete(pairs, "CONTENT_LENGTH")
 	}
 	// write remaining headers
 	for k, v := range pairs {
