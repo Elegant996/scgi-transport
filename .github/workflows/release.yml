@@ -10,6 +10,7 @@ jobs:
   semantic-release:
     name: Release
     runs-on: ubuntu-latest
+    environment: production
 
     permissions:
       contents: write
@@ -22,7 +23,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Semantic Release
+      - name: Run semantic-release
         uses: cycjimmy/semantic-release-action@v4
         with:
           branches: |
