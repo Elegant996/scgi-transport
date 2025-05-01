@@ -60,6 +60,9 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.pusher.name == 'renovate[bot]'
 
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
