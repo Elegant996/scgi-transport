@@ -15,7 +15,6 @@
 package scgi
 
 import (
-	"io"
 	"bytes"
 	"strconv"
 )
@@ -47,19 +46,12 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 		w.buf.WriteByte(0x00)
 	}
 
-	if err := w.writeLength(); err != nil {
-		return err
-	}
+	// writes the buffer length per SCGI requirements
+	w.c.rwc.WriteString(strconv.Itoa(w.buf.Len()) + ":")
+
 	w.buf.WriteByte(',')
 
 	return w.FlushStream()
-}
-
-// writeLength writes the buffer length to front of the writer
-func (w *streamWriter) writeLength() error {
-	s := strconv.Itoa(w.buf.Len()) + ":"
-	_, err := io.WriteString(w.c.rwc, s)
-	return err
 }
 
 // Flush write buffer data to the underlying connection
