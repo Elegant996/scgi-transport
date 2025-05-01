@@ -2,6 +2,8 @@ name: Tests
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 jobs:
@@ -37,6 +39,11 @@ jobs:
           xcaddy build \
             --with github.com/Elegant996/scgi-transport=./
 
+      - name: Approve PR
+        if: github.event_name == 'pull_request'
+        run: |
+          gh pr review --approve "$PR_URL"
+
   renovate:
     needs: [build]
     runs-on: ubuntu-latest
@@ -48,9 +55,8 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Approve and merge PR
+      - name: Auto merge PR
         run: |
-          gh pr review --approve "$PR_URL"
           gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
