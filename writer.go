@@ -15,58 +15,58 @@
 package scgi
 
 import (
-	"io"
 	"bytes"
+	"maps"
 	"strconv"
-)
 
-// SCGI requires content length as the first header
-const FirstHeaderKey string = "CONTENT_LENGTH"
+	"github.com/jub0bs/iterutil"
+)
 
 // streamWriter abstracts out the separation of a stream into discrete netstrings.
 type streamWriter struct {
 	c       *client
 	buf     *bytes.Buffer
+	count	int64
 }
 
-func (w *streamWriter) Write(p []byte) (int, error) {
-	return w.buf.Write(p)
+func (w *streamWriter) Write(p []byte) (n int, err error) {
+	n, err = w.buf.Write(p)
+	w.count += int64(n)
+	return
 }
 
 // writeNetstring writes all headers to the buffer
 func (w *streamWriter) writeNetstring(pairs map[string]string) error {
-	if v, ok := pairs[FirstHeaderKey]; ok {
-		w.buf.WriteString(FirstHeaderKey)
+	w.count = 0
+	if v, ok := pairs["CONTENT_LENGTH"]; ok {
+		w.buf.WriteString("CONTENT_LENGTH")
 		w.buf.WriteByte(0x00)
+		w.count++
 		w.buf.WriteString(v)
 		w.buf.WriteByte(0x00)
-		delete(pairs, FirstHeaderKey)
+		w.count++
 	}
-	// write remaining headers
-	for k, v := range pairs {
+	headers := maps.All(pairs)
+	clFilter := func(h string, _ string) bool { return h != "CONTENT_LENGTH" }
+	for k, v := range iterutil.Filter2(headers, clFilter) {
 		w.buf.WriteString(k)
 		w.buf.WriteByte(0x00)
+		w.count++
 		w.buf.WriteString(v)
 		w.buf.WriteByte(0x00)
+		w.count++
 	}
 
-	if err := w.writeLength(); err != nil {
-		return err
-	}
+	// store string before resetting buffer
+	s := w.buf.String()
+	w.buf.Reset()
+
+	// write the netstring
+	w.buf.WriteString(strconv.FormatInt(w.count, 10))
+	w.buf.WriteByte(':')
+	w.buf.WriteString(s)
 	w.buf.WriteByte(',')
 
-	return w.FlushStream()
-}
-
-// writeLength writes the buffer length to front of the writer
-func (w *streamWriter) writeLength() error {
-	s := strconv.Itoa(w.buf.Len()) + ":"
-	_, err := io.WriteString(w.c.rwc, s)
-	return err
-}
-
-// Flush write buffer data to the underlying connection
-func (w *streamWriter) FlushStream() error {
 	_, err := w.buf.WriteTo(w.c.rwc)
 	return err
 }
