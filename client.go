@@ -22,14 +22,10 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/textproto"
-	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -188,6 +184,53 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 	resp.Body = closer
 
 	return
+}
+
+// Get issues a GET request to the scgi responder.
+func (c *client) Get(p map[string]string, body io.Reader, l int64) (resp *http.Response, err error) {
+	p["REQUEST_METHOD"] = "GET"
+	p["CONTENT_LENGTH"] = strconv.FormatInt(l, 10)
+
+	return c.Request(p, body)
+}
+
+// Head issues a HEAD request to the scgi responder.
+func (c *client) Head(p map[string]string) (resp *http.Response, err error) {
+	p["REQUEST_METHOD"] = "HEAD"
+	p["CONTENT_LENGTH"] = "0"
+
+	return c.Request(p, nil)
+}
+
+// Options issues an OPTIONS request to the scgi responder.
+func (c *client) Options(p map[string]string) (resp *http.Response, err error) {
+	p["REQUEST_METHOD"] = "OPTIONS"
+	p["CONTENT_LENGTH"] = "0"
+
+	return c.Request(p, nil)
+}
+
+// Post issues a POST request to the scgi responder. with request body
+// in the format that bodyType specified
+func (c *client) Post(p map[string]string, method string, bodyType string, body io.Reader, l int64) (resp *http.Response, err error) {
+	if p == nil {
+		p = make(map[string]string)
+	}
+
+	p["REQUEST_METHOD"] = strings.ToUpper(method)
+
+	if len(p["REQUEST_METHOD"]) == 0 || p["REQUEST_METHOD"] == "GET" {
+		p["REQUEST_METHOD"] = "POST"
+	}
+
+	p["CONTENT_LENGTH"] = strconv.FormatInt(l, 10)
+	if len(bodyType) > 0 {
+		p["CONTENT_TYPE"] = bodyType
+	} else {
+		p["CONTENT_TYPE"] = "application/x-www-form-urlencoded"
+	}
+
+	return c.Request(p, body)
 }
 
 // SetReadTimeout sets the read timeout for future calls that read from the
