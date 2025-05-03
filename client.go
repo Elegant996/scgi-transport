@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
 )
 
@@ -55,7 +56,7 @@ type client struct {
 // from scgi responder out of scgi packet before returning it.
 func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error) {
 	writer := &streamWriter{c: c}
-	writer.buf = bufPool.Get().(*bytes.Buffer)
+	writer.buf = bufPool.Get().(*zap.Buffer)
 	writer.buf.Reset()
 	defer bufPool.Put(writer.buf)
 

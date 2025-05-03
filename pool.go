@@ -15,12 +15,12 @@
 package scgi
 
 import (
-	"bytes"
+	"go.uber.org/zap/buffer"
 	"sync"
 )
 
 var bufPool = sync.Pool{
-	New: func() any {
-		return new(bytes.Buffer)
+	New: func() interface{} {
+		return new(zap.Buffer)
 	},
 }
