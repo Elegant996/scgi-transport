@@ -48,7 +48,6 @@ var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3
 // interfacing external applications with Web servers.
 type client struct {
 	rwc net.Conn
-	// keepAlive bool // TODO: implement
 	stderr bool
 	logger *zap.Logger
 }
