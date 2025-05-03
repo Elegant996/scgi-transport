@@ -22,14 +22,11 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/textproto"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -242,48 +239,6 @@ func (c *client) Post(p map[string]string, method string, bodyType string, body 
 func (c *client) PostForm(p map[string]string, data url.Values) (resp *http.Response, err error) {
 	body := bytes.NewReader([]byte(data.Encode()))
 	return c.Post(p, "POST", "application/x-www-form-urlencoded", body, int64(body.Len()))
-}
-
-// PostFile issues a POST to the scgi responder in multipart(RFC 2046) standard,
-// with form as a string key to a list values (url.Values),
-// and/or with file as a string key to a list file path.
-func (c *client) PostFile(p map[string]string, data url.Values, file map[string]string) (resp *http.Response, err error) {
-	buf := &bytes.Buffer{}
-	writer := multipart.NewWriter(buf)
-	bodyType := writer.FormDataContentType()
-
-	for key, val := range data {
-		for _, v0 := range val {
-			err = writer.WriteField(key, v0)
-			if err != nil {
-				return
-			}
-		}
-	}
-
-	for key, val := range file {
-		fd, e := os.Open(val)
-		if e != nil {
-			return nil, e
-		}
-		defer fd.Close()
-
-		part, e := writer.CreateFormFile(key, filepath.Base(val))
-		if e != nil {
-			return nil, e
-		}
-		_, err = io.Copy(part, fd)
-		if err != nil {
-			return
-		}
-	}
-
-	err = writer.Close()
-	if err != nil {
-		return
-	}
-
-	return c.Post(p, "POST", bodyType, buf, int64(buf.Len()))
 }
 
 // SetReadTimeout sets the read timeout for future calls that read from the
