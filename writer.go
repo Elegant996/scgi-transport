@@ -40,17 +40,21 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 	w.count = 0
 	if v, ok := pairs["CONTENT_LENGTH"]; ok {
 		w.buf.WriteString("CONTENT_LENGTH")
-		w.buf.Write(0x00)
+		w.buf.WriteByte(0x00)
+		w.count++
 		w.buf.WriteString(v)
-		w.buf.Write(0x00)
+		w.buf.WriteByte(0x00)
+		w.count++
 	}
 	headers := maps.All(pairs)
 	clFilter := func(h string, _ string) bool { return h != "CONTENT_LENGTH" }
 	for k, v := range iterutil.Filter2(headers, clFilter) {
 		w.buf.WriteString(k)
-		w.buf.Write(0x00)
+		w.buf.WriteByte(0x00)
+		w.count++
 		w.buf.WriteString(v)
-		w.buf.Write(0x00)
+		w.buf.WriteByte(0x00)
+		w.count++
 	}
 
 	// store string before resetting buffer
@@ -58,9 +62,9 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 	w.buf.Reset()
 
 	// write the netstring
-	w.buf.writeString(strconv.Itoa(w.count))
+	w.buf.WriteString(strconv.FormatInt(w.count, 10))
 	w.buf.WriteByte(':')
-	w.buf.writeString(s)
+	w.buf.WriteString(s)
 	w.buf.WriteByte(',')
 
 	_, err := w.buf.WriteTo(w.c.rwc)
