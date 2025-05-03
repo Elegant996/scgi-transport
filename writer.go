@@ -47,8 +47,8 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 		w.count++
 	}
 	headers := maps.All(pairs)
-	clFilter := func(h string, _ string) bool { return h != "CONTENT_LENGTH" }
-	for k, v := range iterutil.Filter2(headers, clFilter) {
+	clStr := func(h string, _ string) bool { return h != "CONTENT_LENGTH" }
+	for k, v := range iterutil.Filter2(headers, clStr) {
 		w.buf.WriteString(k)
 		w.buf.WriteByte(0x00)
 		w.count++
