@@ -233,6 +233,13 @@ func (c *client) Post(p map[string]string, method string, bodyType string, body 
 	return c.Request(p, body)
 }
 
+// PostForm issues a POST to the scgi responder, with form
+// as a string key to a list values (url.Values)
+func (c *client) PostForm(p map[string]string, data url.Values) (resp *http.Response, err error) {
+	body := bytes.NewReader([]byte(data.Encode()))
+	return c.Post(p, "POST", "application/x-www-form-urlencoded", body, int64(body.Len()))
+}
+
 // SetReadTimeout sets the read timeout for future calls that read from the
 // scgi responder. A zero value for t means no timeout will be set.
 func (c *client) SetReadTimeout(t time.Duration) error {
