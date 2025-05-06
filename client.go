@@ -38,13 +38,13 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
-// StatusRegex describes the pattern for a raw HTTP Response code.
-var StatusRegex = regexp.MustCompile("(?i)(?:Status:|HTTP\\/[\\d\\.]+)\\s+(\\d{3}.*)")
+// statusRegex describes the pattern for a raw HTTP Response code.
+var statusRegex = regexp.MustCompile(`(?i)(?:Status:|HTTP\/[\d\.]+)\s+(\d{3}.*)`)
 
 // client implements a SCGI client, which is a standard for
 // interfacing external applications with Web servers.
 type client struct {
-	rwc net.Conn
+	rwc    net.Conn
 	stderr bool
 	logger *zap.Logger
 }
@@ -147,7 +147,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 		if err != nil && err != io.EOF {
 			return
 		}
-		statusLine := StatusRegex.FindStringSubmatch(lineOne)
+		statusLine := statusRegex.FindStringSubmatch(lineOne)
 
 		if len(statusLine) > 1 {
 			statusNumber, statusInfo, statusIsCut := strings.Cut(statusLine[1], " ")
