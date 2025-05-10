@@ -67,6 +67,11 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 	w.buf.WriteString(s)
 	w.buf.WriteByte(',')
 
+	return w.FlushStream()
+}
+
+// FlushStream flush data then end current stream
+func (w *streamWriter) FlushStream() error {
 	_, err := w.buf.WriteTo(w.c.rwc)
 	return err
 }

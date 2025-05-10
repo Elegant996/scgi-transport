@@ -77,6 +77,10 @@ func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error)
 			return nil, err
 		}
 	}
+	err = writer.FlushStream()
+	if err != nil {
+		return nil, err
+	}
 
 	r = &streamReader{c: c}
 	return
