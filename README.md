@@ -1,5 +1,7 @@
 SCGI reverse proxy transport module for Caddy
 ===============================================
+[![test](https://github.com/Elegant996/scgi-transport/workflows/test.yml/badge.svg?branch=main)](https://github.com/Elegant996/scgi-transport/actions)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/Elegant996/scgi-transport/blob/main/LICENSE)
 
 This plugin adds SCGI reverse proxying support to Caddy.
 
