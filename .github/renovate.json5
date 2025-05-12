@@ -27,6 +27,7 @@
     "gomodTidy"
   ],
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":dependencyDashboard"
   ]
 }
