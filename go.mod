@@ -5,7 +5,7 @@ go 1.25
 toolchain go1.25.0
 
 require (
-	github.com/caddyserver/caddy/v2 v2.10.1
+	github.com/caddyserver/caddy/v2 v2.10.2
 	github.com/jub0bs/iterutil v0.5.1
 	go.uber.org/zap v1.27.0
 )
