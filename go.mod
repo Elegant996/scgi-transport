@@ -2,7 +2,7 @@ module github.com/Elegant996/scgi-transport
 
 go 1.25
 
-toolchain go1.25.0
+toolchain go1.25.1
 
 require (
 	github.com/caddyserver/caddy/v2 v2.10.2
