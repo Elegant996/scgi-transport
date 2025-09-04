@@ -16,11 +16,10 @@ package scgi
 
 import (
 	"bytes"
+	"iter"
 	"maps"
 	"strconv"
 	"strings"
-
-	"github.com/jub0bs/iterutil"
 )
 
 // streamWriter abstracts out the separation of a stream into discrete netstrings.
@@ -46,7 +45,7 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 
 	headers := maps.All(pairs)
 	clStr := func(h string, _ string) bool { return h != "CONTENT_LENGTH" }
-	for k, v := range iterutil.Filter2(headers, clStr) {
+	for k, v := range Filter2(headers, clStr) {
 		n, _ := sb.WriteString(k)
 		sb.WriteByte(0x00)
 		m, _ := sb.WriteString(v)
@@ -67,4 +66,16 @@ func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 func (w *streamWriter) FlushStream() error {
 	_, err := w.buf.WriteTo(w.c.rwc)
 	return err
+}
+
+// Filter returns an iterator composed of the pairs of seq that
+// satisfy predicate p.
+func Filter2[K, V any](seq iter.Seq2[K, V], p func(K, V) bool) iter.Seq2[K, V] {
+	return func(yield func(K, V) bool) {
+		for k, v := range seq {
+			if p(k, v) && !yield(k, v) {
+				return
+			}
+		}
+	}
 }
