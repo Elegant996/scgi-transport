@@ -14,13 +14,6 @@
       ],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
-    },
-    {
-      "description": "Automerge go toolchain updates",
-      "matchDatasources": ["golang-version"],
-      "matchDepNames": ["go"],
-      "matchDepTypes": ["toolchain"],
-      "automerge": true
     }
   ],
   "postUpdateOptions": [

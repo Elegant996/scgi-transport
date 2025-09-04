@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+env:
+  # https://github.com/actions/setup-go/issues/491
+  GOTOOLCHAIN: local
+
 jobs:
   build:
     name: Build using caddy builder
