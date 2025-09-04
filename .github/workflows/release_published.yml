@@ -23,7 +23,7 @@ jobs:
             password: ${{ github.token }}
 
       - name: Sanitize repo slug
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         id: repo-slug
         with:
             result-encoding: string
