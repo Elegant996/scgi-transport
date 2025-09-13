@@ -41,78 +41,76 @@ func init() {
 //	    write_timeout <duration>
 //	    capture_stderr
 //	}
-//
 func (t *Transport) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
-	for d.Next() {
-		for d.NextBlock(0) {
-			switch d.Val() {
-			case "root":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				t.Root = d.Val()
-
-			case "split":
-				t.SplitPath = d.RemainingArgs()
-				if len(t.SplitPath) == 0 {
-					return d.ArgErr()
-				}
-
-			case "env":
-				args := d.RemainingArgs()
-				if len(args) != 2 {
-					return d.ArgErr()
-				}
-				if t.EnvVars == nil {
-					t.EnvVars = make(map[string]string)
-				}
-				t.EnvVars[args[0]] = args[1]
-
-			case "resolve_root_symlink":
-				if d.NextArg() {
-					return d.ArgErr()
-				}
-				t.ResolveRootSymlink = true
-
-			case "dial_timeout":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				dur, err := caddy.ParseDuration(d.Val())
-				if err != nil {
-					return d.Errf("bad timeout value %s: %v", d.Val(), err)
-				}
-				t.DialTimeout = caddy.Duration(dur)
-
-			case "read_timeout":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				dur, err := caddy.ParseDuration(d.Val())
-				if err != nil {
-					return d.Errf("bad timeout value %s: %v", d.Val(), err)
-				}
-				t.ReadTimeout = caddy.Duration(dur)
-
-			case "write_timeout":
-				if !d.NextArg() {
-					return d.ArgErr()
-				}
-				dur, err := caddy.ParseDuration(d.Val())
-				if err != nil {
-					return d.Errf("bad timeout value %s: %v", d.Val(), err)
-				}
-				t.WriteTimeout = caddy.Duration(dur)
-
-			case "capture_stderr":
-				if d.NextArg() {
-					return d.ArgErr()
-				}
-				t.CaptureStderr = true
-
-			default:
-				return d.Errf("unrecognized subdirective %s", d.Val())
+	d.Next() // consume transport name
+	for d.NextBlock(0) {
+		switch d.Val() {
+		case "root":
+			if !d.NextArg() {
+				return d.ArgErr()
 			}
+			t.Root = d.Val()
+
+		case "split":
+			t.SplitPath = d.RemainingArgs()
+			if len(t.SplitPath) == 0 {
+				return d.ArgErr()
+			}
+
+		case "env":
+			args := d.RemainingArgs()
+			if len(args) != 2 {
+				return d.ArgErr()
+			}
+			if t.EnvVars == nil {
+				t.EnvVars = make(map[string]string)
+			}
+			t.EnvVars[args[0]] = args[1]
+
+		case "resolve_root_symlink":
+			if d.NextArg() {
+				return d.ArgErr()
+			}
+			t.ResolveRootSymlink = true
+
+		case "dial_timeout":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			dur, err := caddy.ParseDuration(d.Val())
+			if err != nil {
+				return d.Errf("bad timeout value %s: %v", d.Val(), err)
+			}
+			t.DialTimeout = caddy.Duration(dur)
+
+		case "read_timeout":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			dur, err := caddy.ParseDuration(d.Val())
+			if err != nil {
+				return d.Errf("bad timeout value %s: %v", d.Val(), err)
+			}
+			t.ReadTimeout = caddy.Duration(dur)
+
+		case "write_timeout":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			dur, err := caddy.ParseDuration(d.Val())
+			if err != nil {
+				return d.Errf("bad timeout value %s: %v", d.Val(), err)
+			}
+			t.WriteTimeout = caddy.Duration(dur)
+
+		case "capture_stderr":
+			if d.NextArg() {
+				return d.ArgErr()
+			}
+			t.CaptureStderr = true
+
+		default:
+			return d.Errf("unrecognized subdirective %s", d.Val())
 		}
 	}
 	return nil
@@ -271,6 +269,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// the rest of the config is specified by the user
 	// using the reverse_proxy directive syntax
+	dispenser.Next() // consume the directive name
 	err = rpHandler.UnmarshalCaddyfile(dispenser)
 	if err != nil {
 		return nil, err
@@ -282,7 +281,7 @@ func parseSCGI(h httpcaddyfile.Helper) ([]httpcaddyfile.ConfigValue, error) {
 
 	// create the final reverse proxy route
 	rpRoute := caddyhttp.Route{
-		HandlersRaw:    []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
+		HandlersRaw: []json.RawMessage{caddyconfig.JSONModuleObject(rpHandler, "handler", "reverse_proxy", nil)},
 	}
 
 	subroute := caddyhttp.Subroute{
