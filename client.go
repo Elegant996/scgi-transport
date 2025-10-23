@@ -68,7 +68,7 @@ func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error)
 
 	err = writer.writeNetstring(p)
 	if err != nil {
-		return
+		return r, err
 	}
 
 	if req != nil {
@@ -83,7 +83,7 @@ func (c *client) Do(p map[string]string, req io.Reader) (r io.Reader, err error)
 	}
 
 	r = &streamReader{c: c}
-	return
+	return r, err
 }
 
 // clientCloser is a io.ReadCloser. It wraps a io.Reader with a Closer
@@ -120,7 +120,7 @@ func (s clientCloser) Close() error {
 func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Response, err error) {
 	r, err := c.Do(p, req)
 	if err != nil {
-		return
+		return resp, err
 	}
 
 	rb := bufio.NewReader(r)
@@ -130,7 +130,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 	// Parse the response headers.
 	mimeHeader, err := tp.ReadMIMEHeader()
 	if err != nil && err != io.EOF {
-		return
+		return resp, err
 	}
 	resp.Header = http.Header(mimeHeader)
 
@@ -138,7 +138,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 		statusNumber, statusInfo, statusIsCut := strings.Cut(resp.Header.Get("Status"), " ")
 		resp.StatusCode, err = strconv.Atoi(statusNumber)
 		if err != nil {
-			return
+			return resp, err
 		}
 		if statusIsCut {
 			resp.Status = statusInfo
@@ -149,7 +149,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 		var lineOne string
 		lineOne, err = tp.ReadContinuedLine()
 		if err != nil && err != io.EOF {
-			return
+			return resp, err
 		}
 		statusLine := statusRegex.FindStringSubmatch(lineOne)
 
@@ -157,7 +157,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 			statusNumber, statusInfo, statusIsCut := strings.Cut(statusLine[1], " ")
 			resp.StatusCode, err = strconv.Atoi(statusNumber)
 			if err != nil {
-				return
+				return resp, err
 			}
 			if statusIsCut {
 				resp.Status = statusInfo
@@ -188,7 +188,7 @@ func (c *client) Request(p map[string]string, req io.Reader) (resp *http.Respons
 	}
 	resp.Body = closer
 
-	return
+	return resp, err
 }
 
 // Get issues a GET request to the scgi responder.
