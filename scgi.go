@@ -16,6 +16,7 @@ package scgi
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,9 +24,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/text/language"
+	"golang.org/x/text/search"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
@@ -33,7 +37,11 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddytls"
 )
 
-var noopLogger = zap.NewNop()
+var (
+	ErrInvalidSplitPath = errors.New("split path contains non-ASCII characters")
+
+	noopLogger = zap.NewNop()
+)
 
 func init() {
 	caddy.RegisterModule(Transport{})
@@ -49,6 +57,9 @@ type Transport struct {
 	// with the value of SplitPath. The first piece will be assumed as the
 	// actual resource (CGI script) name, and the second piece will be set to
 	// PATH_INFO for the CGI script to use.
+	//
+	// Split paths can only contain ASCII characters.
+	// Comparison is case-insensitive.
 	//
 	// Future enhancements should be careful to avoid CVE-2019-11043,
 	// which can be mitigated with use of a try_files-like behavior
@@ -105,6 +116,29 @@ func (t *Transport) Provision(ctx caddy.Context) error {
 		t.DialTimeout = caddy.Duration(3 * time.Second)
 	}
 
+	var b strings.Builder
+
+	for i, split := range t.SplitPath {
+		splitLen := len(split)
+		b.Grow(splitLen)
+
+		for j := range splitLen {
+			c := split[j]
+			if c >= utf8.RuneSelf {
+				return ErrInvalidSplitPath
+			}
+
+			if 'A' <= c && c <= 'Z' {
+				b.WriteByte(c + 'a' - 'A')
+			} else {
+				b.WriteByte(c)
+			}
+		}
+
+		t.SplitPath[i] = b.String()
+		b.Reset()
+	}
+
 	return nil
 }
 
@@ -138,12 +172,12 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		zap.Object("env", loggableEnv),
 	)
 	if c := t.logger.Check(zapcore.DebugLevel, "roundtrip"); c != nil {
- 		c.Write(
- 			zap.String("dial", address),
- 			zap.Object("env", loggableEnv),
- 			zap.Object("request", loggableReq),
- 		)
- 	}
+		c.Write(
+			zap.String("dial", address),
+			zap.Object("env", loggableEnv),
+			zap.Object("request", loggableReq),
+		)
+	}
 
 	// connect to the backend
 	dialer := net.Dialer{Timeout: time.Duration(t.DialTimeout)}
@@ -370,8 +404,15 @@ func (t Transport) buildEnv(r *http.Request) (envVars, error) {
 	return env, nil
 }
 
+var splitSearchNonASCII = search.New(language.Und, search.IgnoreCase)
+
 // splitPos returns the index where path should
 // be split based on t.SplitPath.
+//
+// example: if splitPath is [".php"]
+// "/path/to/script.php/some/path": ("/path/to/script.php", "/some/path")
+//
+// Adapted from FrankenPHP's code (copyright 2026 Kévin Dunglas, MIT license)
 func (t Transport) splitPos(path string) int {
 	// TODO: from v1...
 	// if httpserver.CaseSensitivePath {
@@ -381,12 +422,54 @@ func (t Transport) splitPos(path string) int {
 		return 0
 	}
 
-	lowerPath := strings.ToLower(path)
+	pathLen := len(path)
+
+	// We are sure that split strings are all ASCII-only and lower-case because of validation and normalization in Provision().
 	for _, split := range t.SplitPath {
-		if idx := strings.Index(lowerPath, strings.ToLower(split)); idx > -1 {
-			return idx + len(split)
+		splitLen := len(split)
+
+		for i := range pathLen {
+			if path[i] >= utf8.RuneSelf {
+				if _, end := splitSearchNonASCII.IndexString(path, split); end > -1 {
+					return end
+				}
+
+				break
+			}
+
+			if i+splitLen > pathLen {
+				continue
+			}
+
+			match := true
+			for j := range splitLen {
+				c := path[i+j]
+
+				if c >= utf8.RuneSelf {
+					if _, end := splitSearchNonASCII.IndexString(path, split); end > -1 {
+						return end
+					}
+
+					break
+				}
+
+				if 'A' <= c && c <= 'Z' {
+					c += 'a' - 'A'
+				}
+
+				if c != split[j] {
+					match = false
+
+					break
+				}
+			}
+
+			if match {
+				return i + splitLen
+			}
 		}
 	}
+
 	return -1
 }
 
