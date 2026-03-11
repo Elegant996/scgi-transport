@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/caddyserver/caddy/v2 v2.11.2
 	go.uber.org/zap v1.27.1
-	golang.org/x/text v0.34.0
+	golang.org/x/text v0.35.0
 )
 
 require (
@@ -116,7 +116,7 @@ require (
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/oauth2 v0.35.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/term v0.40.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
