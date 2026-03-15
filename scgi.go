@@ -208,7 +208,7 @@ func (t Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 
 	contentLength := r.ContentLength
-	if contentLength == 0 {
+	if contentLength <= 0 {
 		contentLength, _ = strconv.ParseInt(r.Header.Get("Content-Length"), 10, 64)
 	}
 
