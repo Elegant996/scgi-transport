@@ -34,6 +34,10 @@ func (w *streamWriter) Write(p []byte) (int, error) {
 
 func (w *streamWriter) writeNetstring(pairs map[string]string) error {
 	var sb strings.Builder
+
+	// Estimate string builder size (Size-Specialized Memory Allocator).
+	sb.Grow(2048)
+
 	if v, ok := pairs["CONTENT_LENGTH"]; ok {
 		sb.WriteString("CONTENT_LENGTH")
 		sb.WriteByte(0x00)
