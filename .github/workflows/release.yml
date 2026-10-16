@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
 
       - name: Run semantic-release
-        uses: cycjimmy/semantic-release-action@v8.1.1
+        uses: cycjimmy/semantic-release-action@v8.1.2
         with:
           branches: |
             [
