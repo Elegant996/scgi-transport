@@ -3,7 +3,7 @@ module github.com/Elegant996/scgi-transport
 go 1.26.0
 
 require (
-	github.com/caddyserver/caddy/v2 v2.11.8
+	github.com/caddyserver/caddy/v2 v2.11.9
 	go.uber.org/zap v1.28.0
 )
 
