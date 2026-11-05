@@ -80,8 +80,8 @@ github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6r
 github.com/bits-and-blooms/bitset v1.20.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/bits-and-blooms/bitset v1.25.0 h1:0Ro0qF4abCkM6SqWPVj29sFhAbMPAZpaDD7xhJ10beM=
 github.com/bits-and-blooms/bitset v1.25.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
-github.com/caddyserver/caddy/v2 v2.11.8 h1:E2pv1BoZ5bJaWqFkU6QvLa21iGAX8bDzlEQG4dDQ/Vc=
-github.com/caddyserver/caddy/v2 v2.11.8/go.mod h1:r8BAzVRMkDEgSi6ckDR57rxeGvylYFeGZZZ8ut7N5hQ=
+github.com/caddyserver/caddy/v2 v2.11.9 h1:bhZtcRKQOq0fuLvEgCdPYvUxXyGn9kzjG4lh2332DTE=
+github.com/caddyserver/caddy/v2 v2.11.9/go.mod h1:jctG0eTy0tC4ST/Q7GIPKIfxox7mhSCtcwlwF82HLVM=
 github.com/caddyserver/certmagic v0.25.6 h1:vHMtFSLKTa6kuZz6w0SnRMpQ388tSkww8ye355BgAM4=
 github.com/caddyserver/certmagic v0.25.6/go.mod h1:xq6cRNimqW+Tv91XNc5lNHs2XYTsLhQhYiH01H4AySs=
 github.com/caddyserver/zerossl v0.1.6 h1:1yrhTx5DWi43wOJPQ+Y4mVl++EPmSqqT/4REW//lsas=
